@@ -8,8 +8,8 @@ export default async function AdminAuditLogPage() {
   if (session?.user?.role !== "admin") {
     return (
       <div className="flex flex-col gap-2">
-        <h2 className="font-semibold">Access denied</h2>
-        <p className="text-sm text-zinc-500">
+        <h2>Access denied</h2>
+        <p className="text-sm text-muted">
           You don&apos;t have permission to view this page.
         </p>
       </div>
@@ -19,33 +19,50 @@ export default async function AdminAuditLogPage() {
   const entries = await db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(200);
 
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="font-semibold">Audit log</h2>
+    <div className="flex flex-col gap-5">
+      <div className="flex items-end justify-between">
+        <div>
+          <div
+            style={{ fontSize: 11, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--color-neutral-600)", marginBottom: 6 }}
+          >
+            Admin
+          </div>
+          <h1 className="text-3xl m-0">Audit log</h1>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted">
+          <span className="tag tag-neutral">{entries.length} entries</span>
+          <span>Last 200 events</span>
+        </div>
+      </div>
 
-      {entries.length === 0 && <p className="text-sm text-zinc-500">No audit entries yet.</p>}
+      {entries.length === 0 && <p className="text-sm text-muted">No audit entries yet.</p>}
 
       {entries.length > 0 && (
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="table">
             <thead>
-              <tr className="text-left text-zinc-500">
-                <th className="pr-4 py-1">Time</th>
-                <th className="pr-4 py-1">Actor</th>
-                <th className="pr-4 py-1">Action</th>
-                <th className="pr-4 py-1">Target</th>
-                <th className="pr-4 py-1">Details</th>
+              <tr>
+                <th style={{ width: 180 }}>Time</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Details</th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry) => (
-                <tr key={entry.id} className="border-t">
-                  <td className="pr-4 py-1 whitespace-nowrap">
+                <tr key={entry.id}>
+                  <td className="mono text-muted whitespace-nowrap text-xs">
                     {entry.createdAt.toLocaleString()}
                   </td>
-                  <td className="pr-4 py-1">{entry.actorEmail}</td>
-                  <td className="pr-4 py-1">{entry.action}</td>
-                  <td className="pr-4 py-1">{entry.target ?? "—"}</td>
-                  <td className="pr-4 py-1">{entry.details ?? "—"}</td>
+                  <td className="text-[13px]">{entry.actorEmail}</td>
+                  <td>
+                    <span className="tag tag-accent" style={{ fontSize: 10 }}>
+                      {entry.action}
+                    </span>
+                  </td>
+                  <td className="mono text-muted text-xs">{entry.target ?? "—"}</td>
+                  <td className="text-muted text-[12.5px]">{entry.details ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

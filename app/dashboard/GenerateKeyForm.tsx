@@ -100,111 +100,164 @@ export function GenerateKeyForm() {
     }
   }
 
+  const kicker = { fontSize: 13, letterSpacing: ".06em", textTransform: "uppercase" as const, fontFamily: "var(--font-heading)", fontWeight: 800 };
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 max-w-sm border rounded p-4">
-      <h2 className="font-semibold">Generate a new key</h2>
-
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Title (e.g. Release signing key)"
-        required
-        className="border rounded px-3 py-2"
-      />
-      <textarea
-        value={details}
-        onChange={(e) => setDetails(e.target.value)}
-        placeholder="Details (optional notes about this key)"
-        rows={2}
-        className="border rounded px-3 py-2"
-      />
-
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Name"
-        required
-        className="border rounded px-3 py-2"
-      />
-      <input
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        type="email"
-        placeholder="Key email"
-        required
-        className="border rounded px-3 py-2"
-      />
-
-      <label className="text-sm text-zinc-500">
-        Algorithm
-        <select
-          value={algorithm}
-          onChange={(e) => setAlgorithm(e.target.value as AlgorithmKey)}
-          className="mt-1 w-full border rounded px-3 py-2"
-        >
-          {Object.entries(ALGORITHMS).map(([key, { label }]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="text-sm text-zinc-500">
-        Expires
-        <select
-          value={expiration}
-          onChange={(e) => setExpiration(e.target.value as ExpirationKey)}
-          className="mt-1 w-full border rounded px-3 py-2"
-        >
-          {Object.entries(EXPIRATIONS).map(([key, { label }]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div className="flex flex-col gap-1">
-        <div className="flex gap-2">
-          <input
-            value={passphrase}
-            onChange={(e) => setPassphrase(e.target.value)}
-            type={showPassphrase ? "text" : "password"}
-            placeholder="Passphrase (protects the private key)"
-            minLength={8}
-            required
-            className="flex-1 border rounded px-3 py-2"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setPassphrase(generatePassphrase());
-              setShowPassphrase(true);
-            }}
-            className="border rounded px-3 py-2 text-sm whitespace-nowrap"
-          >
-            Generate
-          </button>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-8 max-w-3xl">
+      <section>
+        <div className="flex items-center gap-2.5 mb-4">
+          <span style={kicker}>01 · Identity</span>
+          <div className="flex-1" style={{ height: 2, background: "var(--color-divider)" }} />
         </div>
-        {passphrase && (
-          <div className="flex items-center gap-3 text-xs text-zinc-500">
-            <button type="button" onClick={() => setShowPassphrase((v) => !v)} className="underline">
-              {showPassphrase ? "Hide" : "Show"}
-            </button>
-            <CopyButton text={passphrase} />
-            <span>Save this somewhere — it can&apos;t be recovered if lost.</span>
+        <div className="flex flex-col gap-4">
+          <div className="field">
+            <label htmlFor="g-title">Title</label>
+            <input
+              id="g-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Release signing key"
+              required
+              className="input"
+            />
           </div>
+          <div className="field">
+            <label htmlFor="g-details">
+              Details <span className="normal-case text-muted font-normal">— optional</span>
+            </label>
+            <textarea
+              id="g-details"
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              placeholder="Notes about this key"
+              rows={2}
+              className="input"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="g-name">Name</label>
+            <input
+              id="g-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ada Lovelace"
+              required
+              className="input"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="g-email">Key email</label>
+            <input
+              id="g-email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="ada@lovelace.dev"
+              required
+              className="input"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div className="flex items-center gap-2.5 mb-4">
+          <span style={kicker}>02 · Security</span>
+          <div className="flex-1" style={{ height: 2, background: "var(--color-divider)" }} />
+        </div>
+        <div className="flex flex-col gap-4">
+          <div className="field">
+            <label>Algorithm</label>
+            <div className="flex flex-col gap-px" style={{ border: "1px solid var(--color-divider)", background: "var(--color-divider)" }}>
+              {Object.entries(ALGORITHMS).map(([key, { label }]) => (
+                <label
+                  key={key}
+                  className="keyrow flex items-center gap-3 px-3.5 py-2.5 cursor-pointer"
+                  style={{ background: algorithm === key ? "color-mix(in srgb,var(--color-accent) 7%,var(--color-bg))" : "var(--color-bg)" }}
+                >
+                  <input
+                    type="radio"
+                    name="algo"
+                    checked={algorithm === key}
+                    onChange={() => setAlgorithm(key as AlgorithmKey)}
+                    style={{ accentColor: "var(--color-accent)", width: 15, height: 15, flexShrink: 0 }}
+                  />
+                  <span className="text-[13.5px] font-semibold whitespace-nowrap" style={{ fontFamily: "var(--font-heading)" }}>
+                    {label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="field">
+            <label>Expires</label>
+            <div className="seg flex">
+              {Object.entries(EXPIRATIONS).map(([key, { label }]) => (
+                <label key={key} className="seg-opt flex-1">
+                  <input
+                    type="radio"
+                    name="exp"
+                    checked={expiration === key}
+                    onChange={() => setExpiration(key as ExpirationKey)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="g-pass">
+              Passphrase <span className="normal-case text-muted font-normal">— protects the private key</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="g-pass"
+                value={passphrase}
+                onChange={(e) => setPassphrase(e.target.value)}
+                type={showPassphrase ? "text" : "password"}
+                placeholder="8+ characters"
+                minLength={8}
+                required
+                className="input mono flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setPassphrase(generatePassphrase());
+                  setShowPassphrase(true);
+                }}
+                className="btn btn-secondary whitespace-nowrap"
+              >
+                Generate
+              </button>
+            </div>
+            {passphrase && (
+              <div className="flex items-center gap-4 mt-2.5 text-xs text-muted">
+                <button type="button" onClick={() => setShowPassphrase((v) => !v)} className="lnk">
+                  {showPassphrase ? "Hide" : "Show"}
+                </button>
+                <CopyButton text={passphrase} />
+                <span>Save it — it can&apos;t be recovered.</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <div style={{ height: 2, background: "var(--color-divider)" }} />
+
+      <div className="flex items-center justify-between">
+        {status ? (
+          <p className="text-[12.5px] text-muted m-0">{status}</p>
+        ) : (
+          <span />
         )}
+        <button type="submit" disabled={busy} className="btn btn-primary" style={{ minWidth: 190 }}>
+          {busy ? "Working…" : "Generate & save"}
+        </button>
       </div>
-      <button
-        type="submit"
-        disabled={busy}
-        className="bg-black text-white rounded px-3 py-2 disabled:opacity-50"
-      >
-        {busy ? "Working…" : "Generate & save"}
-      </button>
-      {status && <p className="text-sm text-zinc-500">{status}</p>}
     </form>
   );
 }

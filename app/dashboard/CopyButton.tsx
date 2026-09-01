@@ -12,7 +12,7 @@ export function CopyButton({ text }: { text: string }) {
   }
 
   return (
-    <button type="button" onClick={handleCopy} className="text-xs underline text-zinc-500">
+    <button type="button" onClick={handleCopy} className="btn btn-ghost text-xs">
       {copied ? "Copied" : "Copy"}
     </button>
   );

@@ -40,26 +40,16 @@ export function KeyActions({
   }
 
   return (
-    <div className="mt-3 flex items-center gap-3">
+    <div className="mt-4 flex items-center gap-4 text-xs" style={{ color: "var(--color-accent-700)" }}>
       {!isRevoked && canRevoke && (
-        <button
-          type="button"
-          onClick={handleRevoke}
-          disabled={pending}
-          className="text-xs text-amber-600 underline disabled:opacity-50"
-        >
+        <button type="button" onClick={handleRevoke} disabled={pending} className="lnk disabled:opacity-50">
           Revoke
         </button>
       )}
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={pending}
-        className="text-xs text-red-600 underline disabled:opacity-50"
-      >
+      <button type="button" onClick={handleDelete} disabled={pending} className="lnk disabled:opacity-50">
         Delete
       </button>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span style={{ color: "var(--color-accent-700)" }}>{error}</span>}
     </div>
   );
 }
