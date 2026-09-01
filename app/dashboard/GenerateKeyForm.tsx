@@ -64,7 +64,7 @@ export function GenerateKeyForm() {
       const publicKeyObj = await openpgp.readKey({ armoredKey: publicKey });
 
       setStatus("Saving…");
-      await saveKey({
+      const { emailSent } = await saveKey({
         title,
         details: details || null,
         name,
@@ -75,16 +75,24 @@ export function GenerateKeyForm() {
         publicKey,
         privateKey,
         revocationCertificate,
+        passphrase,
       });
 
-      setStatus("Key generated and saved.");
-      setTitle("");
-      setDetails("");
-      setName("");
-      setEmail("");
-      setPassphrase("");
-      setShowPassphrase(false);
-      router.push("/dashboard");
+      if (emailSent) {
+        setStatus("Key generated and saved. Passphrase emailed to you.");
+        setTitle("");
+        setDetails("");
+        setName("");
+        setEmail("");
+        setPassphrase("");
+        setShowPassphrase(false);
+        router.push("/dashboard");
+      } else {
+        // Don't clear the passphrase or navigate away — Copy/Show above is the
+        // only remaining way to get it since the email didn't go out.
+        setStatus("Key generated and saved, but the passphrase email failed to send. Copy it above before leaving this page.");
+        setShowPassphrase(true);
+      }
     } catch {
       setStatus("Failed to generate or save key.");
     } finally {
