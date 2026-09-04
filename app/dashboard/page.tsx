@@ -76,7 +76,10 @@ export default async function DashboardPage() {
                 </div>
 
                 <div className="mt-4">
-                  <div style={{ ...kicker, marginBottom: 8 }}>Fingerprint</div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span style={kicker}>Fingerprint</span>
+                    <CopyButton text={key.fingerprint} />
+                  </div>
                   <div
                     className="mono text-[13px] px-3.5 py-3"
                     style={{ background: "var(--color-neutral-200)", border: "1px solid var(--color-divider)", letterSpacing: ".03em", wordBreak: "break-all" }}
