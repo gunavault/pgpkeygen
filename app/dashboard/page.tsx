@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
 import { CopyButton } from "./CopyButton";
 import { KeyActions } from "./KeyActions";
+import { ExportKeysButton } from "./ExportKeysButton";
 
 function fingerprintPretty(fp: string) {
   return (fp.match(/.{1,4}/g) || []).join(" ");
@@ -29,12 +30,15 @@ export default async function DashboardPage() {
           <div style={{ ...kicker, marginBottom: 6, color: "var(--color-neutral-600)" }}>Vault</div>
           <h1 className="text-3xl m-0">Your keys</h1>
         </div>
-        <Link href="/dashboard/generate" className="btn btn-primary whitespace-nowrap">
-          New key
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12h14" /><path d="M12 5v14" />
-          </svg>
-        </Link>
+        <div className="flex items-center gap-2">
+          <ExportKeysButton keys={keys} />
+          <Link href="/dashboard/generate" className="btn btn-primary whitespace-nowrap">
+            New key
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14" /><path d="M12 5v14" />
+            </svg>
+          </Link>
+        </div>
       </div>
 
       {keys.length === 0 && <p className="text-sm text-muted">No keys yet.</p>}
