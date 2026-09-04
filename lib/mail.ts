@@ -31,11 +31,14 @@ export async function sendPassphraseEmail(
   const t = getTransporter();
   if (!t) return false;
 
+  // Sanitize subject to prevent CRLF / Email Header Injection vulnerability
+  const safeTitle = keyTitle.replace(/[\r\n]+/g, " ").trim();
+
   try {
     await t.sendMail({
       from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
       to,
-      subject: `PGP key passphrase: ${keyTitle}`,
+      subject: `PGP key passphrase: ${safeTitle}`,
       text: `Your passphrase for the key "${keyTitle}" is:\n\n${passphrase}\n\nStore this somewhere safe — it cannot be recovered if lost.`,
     });
     return true;
