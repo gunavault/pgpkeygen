@@ -11,8 +11,6 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env (see .env.example)}
       # Trust X-Forwarded-For only when a sanitizing reverse proxy is the sole ingress.
       TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
-      # Comma-separated emails that get the admin role on registration.
-      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     depends_on:
       db:
         condition: service_healthy
