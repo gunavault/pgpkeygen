@@ -12,8 +12,11 @@ type RateLimitEntry = {
  */
 export class FixedWindowRateLimiter {
   private readonly hits = new Map<string, RateLimitEntry>();
+  private readonly now: () => number;
 
-  constructor(private readonly now: () => number = Date.now) {}
+  constructor(now: () => number = Date.now) {
+    this.now = now;
+  }
 
   isLimited(key: string, limit: number, windowMs: number): boolean {
     const now = this.now();
