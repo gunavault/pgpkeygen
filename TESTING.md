@@ -23,17 +23,19 @@ pnpm test
 pnpm test:coverage
 pnpm typecheck
 pnpm lint
+pnpm audit
 pnpm build
-pnpm audit --audit-level high
 ```
 
-Run the normal non-audit validation gate with:
+Run the complete required validation gate with:
 
 ```sh
 pnpm check
 ```
 
-CI runs lint, TypeScript checking, tests, the production build, and dependency auditing on every push and pull request.
+CI runs lint, TypeScript checking, tests, dependency auditing, and the production build on every push and pull request.
+
+The initial dependency-audit gate fails on **critical** advisories. Issue #13 tracks upgrading Nodemailer and tightening the policy after the known dependency debt is removed; lowering the threshold to hide a newly introduced critical advisory is not acceptable.
 
 ## What should be tested first
 
