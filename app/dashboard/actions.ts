@@ -1,12 +1,13 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import * as openpgp from "openpgp";
 import { revalidatePath } from "next/cache";
 import { auth, signOut } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
 import { logAudit } from "@/lib/audit";
+import { canCreateKey, parseMaxKeysPerUser } from "@/lib/key-quota";
 import { validateKeyMaterial } from "@/lib/pgp-validation";
 import { chooseRevocationCertificate } from "@/lib/revocation-policy";
 
@@ -26,18 +27,32 @@ export async function saveKey(input: {
   }
 
   const metadata = await validateKeyMaterial(input.publicKey, input.privateKey);
+  const maxKeys = parseMaxKeysPerUser(process.env.MAX_KEYS_PER_USER);
 
-  await db.insert(pgpKeys).values({
-    userId: session.user.id,
-    title,
-    details,
-    name: metadata.name,
-    email: metadata.email,
-    algorithm: metadata.algorithm,
-    expiresAt: metadata.expiresAt,
-    fingerprint: metadata.fingerprint,
-    publicKey: input.publicKey,
-    privateKey: input.privateKey,
+  await db.transaction(async (tx) => {
+    // Serialize creation per user so concurrent requests cannot race past the quota.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${session.user.id}))`);
+    const [usage] = await tx
+      .select({ total: count(pgpKeys.id) })
+      .from(pgpKeys)
+      .where(eq(pgpKeys.userId, session.user.id));
+
+    if (!canCreateKey(Number(usage?.total ?? 0), maxKeys)) {
+      throw new Error("Key limit reached");
+    }
+
+    await tx.insert(pgpKeys).values({
+      userId: session.user.id,
+      title,
+      details,
+      name: metadata.name,
+      email: metadata.email,
+      algorithm: metadata.algorithm,
+      expiresAt: metadata.expiresAt,
+      fingerprint: metadata.fingerprint,
+      publicKey: input.publicKey,
+      privateKey: input.privateKey,
+    });
   });
 
   await logAudit(session.user.email!, "key.generated", title, `fingerprint: ${metadata.fingerprint}`);
