@@ -4,18 +4,31 @@ type RateLimitEntry = {
 };
 
 /**
- * Deterministic fixed-window rate-limit state.
+ * Deterministic fixed-window rate-limit state with a hard key bound.
  *
- * Keeping time as a dependency makes the security behavior testable without
- * fake timers or framework mocks. Storage remains process-local for now; issue
- * #7 tracks replacing this with a deployment-safe bounded/shared design.
+ * This remains process-local, which is appropriate only for a single app
+ * instance. The hard capacity prevents attacker-controlled keys from growing
+ * memory without bound; when the store is full and no expired entries can be
+ * reclaimed, new keys fail closed as limited.
  */
 export class FixedWindowRateLimiter {
   private readonly hits = new Map<string, RateLimitEntry>();
   private readonly now: () => number;
+  private readonly maxEntries: number;
 
-  constructor(now: () => number = Date.now) {
+  constructor(now: () => number = Date.now, maxEntries = 5_000) {
     this.now = now;
+    this.maxEntries = maxEntries;
+  }
+
+  get size(): number {
+    return this.hits.size;
+  }
+
+  private reclaimExpired(now: number): void {
+    for (const [key, entry] of this.hits) {
+      if (now > entry.resetAt) this.hits.delete(key);
+    }
   }
 
   isLimited(key: string, limit: number, windowMs: number): boolean {
@@ -23,6 +36,11 @@ export class FixedWindowRateLimiter {
     const entry = this.hits.get(key);
 
     if (!entry || now > entry.resetAt) {
+      if (!entry && this.hits.size >= this.maxEntries) {
+        this.reclaimExpired(now);
+        if (this.hits.size >= this.maxEntries) return true;
+      }
+
       this.hits.set(key, { count: 1, resetAt: now + windowMs });
       return false;
     }
