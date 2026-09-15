@@ -130,12 +130,11 @@ function aadFor(context: EscrowContext): Uint8Array {
   return encoder.encode(`pgpkeygen:passphrase-escrow:v1\0${userId}\0${fingerprint}`);
 }
 
-export async function createVaultEnvelope(
-  password: string,
-): Promise<{ envelope: VaultEnvelope; vaultKey: Uint8Array }> {
+async function wrapVaultKey(password: string, vaultKey: Uint8Array): Promise<VaultEnvelope> {
+  if (vaultKey.length !== VAULT_KEY_BYTES) throw new Error("Invalid vault key");
+
   const salt = randomBytes(SALT_BYTES);
   const iv = randomBytes(GCM_IV_BYTES);
-  const vaultKey = randomBytes(VAULT_KEY_BYTES);
   const passwordKey = await derivePasswordKey(password, salt);
   const ciphertext = new Uint8Array(
     await crypto.subtle.encrypt(
@@ -146,15 +145,22 @@ export async function createVaultEnvelope(
   );
 
   return {
+    version: VAULT_ENVELOPE_VERSION,
+    kdf: "PBKDF2-SHA-256",
+    iterations: PBKDF2_ITERATIONS,
+    salt: bytesToBase64(salt),
+    iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(ciphertext),
+  };
+}
+
+export async function createVaultEnvelope(
+  password: string,
+): Promise<{ envelope: VaultEnvelope; vaultKey: Uint8Array }> {
+  const vaultKey = randomBytes(VAULT_KEY_BYTES);
+  return {
     vaultKey,
-    envelope: {
-      version: VAULT_ENVELOPE_VERSION,
-      kdf: "PBKDF2-SHA-256",
-      iterations: PBKDF2_ITERATIONS,
-      salt: bytesToBase64(salt),
-      iv: bytesToBase64(iv),
-      ciphertext: bytesToBase64(ciphertext),
-    },
+    envelope: await wrapVaultKey(password, vaultKey),
   };
 }
 
@@ -177,6 +183,15 @@ export async function unwrapVaultEnvelope(
   } catch {
     throw new Error("Unable to unlock vault");
   }
+}
+
+export async function rewrapVaultEnvelope(
+  oldPassword: string,
+  newPassword: string,
+  envelope: VaultEnvelope,
+): Promise<VaultEnvelope> {
+  const vaultKey = await unwrapVaultEnvelope(oldPassword, envelope);
+  return wrapVaultKey(newPassword, vaultKey);
 }
 
 export async function wrapEscrowSecret(
