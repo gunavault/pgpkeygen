@@ -12,10 +12,12 @@ export function KeyActions({
   keyId,
   isRevoked,
   hasLegacyCertificate,
+  hasEscrow,
 }: {
   keyId: string;
   isRevoked: boolean;
   hasLegacyCertificate: boolean;
+  hasEscrow: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +89,7 @@ export function KeyActions({
             Revoke
           </button>
         )}
+        {hasEscrow && <span className="text-muted">Encrypted recovery available</span>}
         {hasLegacyCertificate && (
           <button type="button" onClick={handleLoadLegacy} disabled={pending} className="lnk disabled:opacity-50">
             Export legacy revocation certificate
