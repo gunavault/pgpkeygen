@@ -32,7 +32,13 @@ const EXPIRATIONS = {
   "4y": { label: "4 years", seconds: 60 * 60 * 24 * 365 * 4 },
 };
 type ExpirationKey = keyof typeof EXPIRATIONS;
-type PendingKey = Parameters<typeof saveKey>[0];
+type PendingKey = Parameters<typeof saveKey>[0] & {
+  name: string;
+  email: string;
+  algorithm: string;
+  expiresAt: string | null;
+  fingerprint: string;
+};
 
 export function GenerateKeyForm() {
   const router = useRouter();
@@ -93,15 +99,20 @@ export function GenerateKeyForm() {
     if (!pendingKey || !passphraseSaved || !revocationSaved) return;
     setBusy(true);
     try {
-      setStatus("Saving encrypted key material…");
-      await saveKey(pendingKey);
+      setStatus("Validating and saving encrypted key material…");
+      await saveKey({
+        title: pendingKey.title,
+        details: pendingKey.details,
+        publicKey: pendingKey.publicKey,
+        privateKey: pendingKey.privateKey,
+      });
       setPassphrase("");
       setRevocationCertificate("");
       setPendingKey(null);
-      setStatus("Key saved. Passphrase and revocation certificate stayed in your browser.");
+      setStatus("Key saved after server-side OpenPGP validation. Recovery artifacts stayed in your browser.");
       router.push("/dashboard");
     } catch {
-      setStatus("Failed to save key. Your local recovery artifacts have not been sent to the server.");
+      setStatus("Failed to validate or save key. Your local recovery artifacts have not been sent to the server.");
     } finally {
       setBusy(false);
     }
@@ -124,9 +135,7 @@ export function GenerateKeyForm() {
           <div className="flex gap-2 items-center">
             <input id="generated-passphrase" value={passphrase} readOnly type={showPassphrase ? "text" : "password"} className="input mono flex-1" />
             <CopyButton text={passphrase} />
-            <button type="button" className="btn btn-secondary" onClick={() => setShowPassphrase((value) => !value)}>
-              {showPassphrase ? "Hide" : "Show"}
-            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowPassphrase((value) => !value)}>{showPassphrase ? "Hide" : "Show"}</button>
           </div>
         </div>
 
@@ -136,14 +145,9 @@ export function GenerateKeyForm() {
         </label>
 
         <div className="field">
-          <div className="flex items-center justify-between mb-2">
-            <label htmlFor="generated-revocation">Revocation certificate</label>
-            <CopyButton text={revocationCertificate} />
-          </div>
+          <div className="flex items-center justify-between mb-2"><label htmlFor="generated-revocation">Revocation certificate</label><CopyButton text={revocationCertificate} /></div>
           <textarea id="generated-revocation" value={revocationCertificate} readOnly rows={8} className="input mono text-xs" />
-          <p className="text-xs text-muted m-0 mt-2">
-            Keep this separately. Anyone who obtains it can permanently revoke this key.
-          </p>
+          <p className="text-xs text-muted m-0 mt-2">Keep this separately. Anyone who obtains it can permanently revoke this key.</p>
         </div>
 
         <label className="flex items-start gap-3 text-sm">
@@ -152,27 +156,9 @@ export function GenerateKeyForm() {
         </label>
 
         {status && <p className="text-[12.5px] text-muted m-0">{status}</p>}
-
         <div className="flex gap-3">
-          <button type="button" disabled={!passphraseSaved || !revocationSaved || busy} className="btn btn-primary" onClick={handleSave}>
-            {busy ? "Saving…" : "Save key to vault"}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            className="btn btn-secondary"
-            onClick={() => {
-              if (window.confirm("Discard this generated key and its unsaved recovery artifacts?")) {
-                setPendingKey(null);
-                setPassphraseSaved(false);
-                setRevocationSaved(false);
-                setRevocationCertificate("");
-                setStatus(null);
-              }
-            }}
-          >
-            Discard generated key
-          </button>
+          <button type="button" disabled={!passphraseSaved || !revocationSaved || busy} className="btn btn-primary" onClick={handleSave}>{busy ? "Saving…" : "Save key to vault"}</button>
+          <button type="button" disabled={busy} className="btn btn-secondary" onClick={() => { if (window.confirm("Discard this generated key and its unsaved recovery artifacts?")) { setPendingKey(null); setPassphraseSaved(false); setRevocationSaved(false); setRevocationCertificate(""); setStatus(null); } }}>Discard generated key</button>
         </div>
       </section>
     );
@@ -195,23 +181,9 @@ export function GenerateKeyForm() {
       <section>
         <div className="flex items-center gap-2.5 mb-4"><span style={kicker}>02 · Security</span><div className="flex-1" style={{ height: 2, background: "var(--color-divider)" }} /></div>
         <div className="flex flex-col gap-4">
-          <div className="field">
-            <label>Algorithm</label>
-            <div className="flex flex-col gap-px" style={{ border: "1px solid var(--color-divider)", background: "var(--color-divider)" }}>
-              {Object.entries(ALGORITHMS).map(([key, { label }]) => (
-                <label key={key} className="keyrow flex items-center gap-3 px-3.5 py-2.5 cursor-pointer" style={{ background: algorithm === key ? "color-mix(in srgb,var(--color-accent) 7%,var(--color-bg))" : "var(--color-bg)" }}>
-                  <input type="radio" name="algo" checked={algorithm === key} onChange={() => setAlgorithm(key as AlgorithmKey)} style={{ accentColor: "var(--color-accent)", width: 15, height: 15, flexShrink: 0 }} />
-                  <span className="text-[13.5px] font-semibold whitespace-nowrap" style={{ fontFamily: "var(--font-heading)" }}>{label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+          <div className="field"><label>Algorithm</label><div className="flex flex-col gap-px" style={{ border: "1px solid var(--color-divider)", background: "var(--color-divider)" }}>{Object.entries(ALGORITHMS).map(([key, { label }]) => (<label key={key} className="keyrow flex items-center gap-3 px-3.5 py-2.5 cursor-pointer" style={{ background: algorithm === key ? "color-mix(in srgb,var(--color-accent) 7%,var(--color-bg))" : "var(--color-bg)" }}><input type="radio" name="algo" checked={algorithm === key} onChange={() => setAlgorithm(key as AlgorithmKey)} style={{ accentColor: "var(--color-accent)", width: 15, height: 15, flexShrink: 0 }} /><span className="text-[13.5px] font-semibold whitespace-nowrap" style={{ fontFamily: "var(--font-heading)" }}>{label}</span></label>))}</div></div>
           <div className="field"><label>Expires</label><div className="seg flex">{Object.entries(EXPIRATIONS).map(([key, { label }]) => (<label key={key} className="seg-opt flex-1"><input type="radio" name="exp" checked={expiration === key} onChange={() => setExpiration(key as ExpirationKey)} />{label}</label>))}</div></div>
-          <div className="field">
-            <label htmlFor="g-pass">Passphrase <span className="normal-case text-muted font-normal">— protects the private key</span></label>
-            <div className="flex gap-2"><input id="g-pass" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} type={showPassphrase ? "text" : "password"} placeholder="8+ characters" minLength={8} required className="input mono flex-1" /><button type="button" onClick={() => { setPassphrase(generatePassphrase()); setShowPassphrase(true); }} className="btn btn-secondary whitespace-nowrap">Generate</button></div>
-            {passphrase && <div className="flex items-center gap-4 mt-2.5 text-xs text-muted"><button type="button" onClick={() => setShowPassphrase((v) => !v)} className="lnk">{showPassphrase ? "Hide" : "Show"}</button><CopyButton text={passphrase} /><span>Keep it safe — the server will never receive it.</span></div>}
-          </div>
+          <div className="field"><label htmlFor="g-pass">Passphrase <span className="normal-case text-muted font-normal">— protects the private key</span></label><div className="flex gap-2"><input id="g-pass" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} type={showPassphrase ? "text" : "password"} placeholder="8+ characters" minLength={8} required className="input mono flex-1" /><button type="button" onClick={() => { setPassphrase(generatePassphrase()); setShowPassphrase(true); }} className="btn btn-secondary whitespace-nowrap">Generate</button></div>{passphrase && <div className="flex items-center gap-4 mt-2.5 text-xs text-muted"><button type="button" onClick={() => setShowPassphrase((v) => !v)} className="lnk">{showPassphrase ? "Hide" : "Show"}</button><CopyButton text={passphrase} /><span>Keep it safe — the server will never receive it.</span></div>}</div>
         </div>
       </section>
 
