@@ -3,6 +3,7 @@
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { signIn } from "@/auth";
+import { normalizeEmail } from "@/lib/identity";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 
 const LOGIN_ACCOUNT_LIMIT = 5;
@@ -11,7 +12,7 @@ const LOGIN_GLOBAL_LIMIT = 500;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 export async function login(formData: FormData) {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = normalizeEmail(formData.get("email"));
   const password = String(formData.get("password") ?? "");
   const ip = await getClientIp();
 
