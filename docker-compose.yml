@@ -1,4 +1,27 @@
 services:
+  app:
+    build: .
+    image: pgpkeygen
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://pgpkeygen:pgpkeygen@db:5432/pgpkeygen
+      # Generate one with: openssl rand -base64 32
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env (see .env.example)}
+      # Comma-separated emails that get the admin role on registration.
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      # Optional: passphrase emails are skipped when SMTP_HOST is empty.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -7,9 +30,15 @@ services:
       POSTGRES_PASSWORD: pgpkeygen
       POSTGRES_DB: pgpkeygen
     ports:
+      # Exposed on 5433 so `pnpm dev` on the host can use the same database.
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pgpkeygen -d pgpkeygen"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   pgdata:
