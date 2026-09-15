@@ -20,6 +20,30 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Finding keys
+
+The **Your keys** page filters from the URL, so a filtered view can be reloaded
+or shared and works without JavaScript:
+
+- `?q=<text>` — case-insensitive match against a key's title, name, email,
+  details, or fingerprint (spaces in a pasted fingerprint are ignored).
+- `?status=active` or `?status=revoked` — narrow to non-revoked or revoked keys.
+  Any other value shows all keys.
+
+Both can be combined, e.g. `/dashboard?q=release&status=active`.
+
+## Running tests
+
+Unit tests live next to the code as `*.test.ts` and use Node's built-in test
+runner, so no extra dependency is needed:
+
+```bash
+node --import ./scripts/test-register.mjs --test lib/*.test.ts
+```
+
+The `--import` preload lets test files use the same extensionless imports as
+the rest of the codebase.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
