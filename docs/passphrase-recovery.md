@@ -15,6 +15,8 @@ The vault salt is separate from the authentication password-hash salt. The vault
 
 The envelope is initialized after a successful login, when the server has just verified the submitted credentials. If a reload removes the in-memory vault key, recovery for new keys remains locked until the user signs in again rather than creating a replacement envelope from an unverified password.
 
+Because login initializes the envelope before any individual key necessarily opts into recovery, a database containing that envelope can be used as an offline verifier for guesses of the account password. With no per-key escrow records, however, cracking that account password still does not recover the independently kept PGP passphrases. Once a key opts into recovery, the same password also becomes the protection boundary for that key's escrowed passphrase.
+
 ## Authenticated record binding
 
 Each per-key ciphertext uses AES-GCM additional authenticated data containing a domain separator, the authenticated user ID, and the PGP key fingerprint.
@@ -37,11 +39,11 @@ This makes password rotation a single-envelope operation and also leaves a clean
 
 Recovery changes the compromise model deliberately:
 
-| Threat | Recovery off | Recovery on |
+| Threat | No key has opted into recovery | A key has opted into recovery |
 | --- | --- | --- |
-| Database dump / backup / SQL injection | Encrypted private key still requires an independently kept passphrase | Stored envelope permits offline guessing against the account password |
-| Compromised application server | Normal stored data does not contain the passphrase | Not protected: the credentials provider already receives the raw password during login |
-| XSS active during unlock/reveal | No application recovery path exists | Can expose plaintext or in-memory recovery material at the moment it is used |
+| Database dump / backup / SQL injection | The login-created envelope permits offline guessing of the account password, but the PGP passphrase remains independently held | Offline account-password guessing can also unlock the escrowed PGP passphrase |
+| Compromised application server | Normal stored key data does not contain the PGP passphrase | Not protected: the credentials provider already receives the raw account password during login |
+| XSS active during unlock/reveal | No per-key application recovery plaintext exists | Can expose plaintext or in-memory recovery material at the moment it is used |
 | Old plaintext-email design | Not used | Better: plaintext never lands in SMTP or an inbox |
 
 **User-facing cost:** enabling recovery makes account-password strength the single point of failure for the confidentiality of that key's passphrase. A stolen database does not immediately reveal plaintext, but it gives an attacker material for offline password guessing.
