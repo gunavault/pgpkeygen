@@ -6,7 +6,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgres://pgpkeygen:pgpkeygen@db:5432/pgpkeygen
+      DATABASE_URL: postgres://${POSTGRES_USER:-pgpkeygen}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}@db:5432/${POSTGRES_DB:-pgpkeygen}
       # Generate one with: openssl rand -base64 32
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env (see .env.example)}
       # Comma-separated emails that get the admin role on registration.
@@ -26,16 +26,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: pgpkeygen
-      POSTGRES_PASSWORD: pgpkeygen
-      POSTGRES_DB: pgpkeygen
-    ports:
-      # Exposed on 5433 so `pnpm dev` on the host can use the same database.
-      - "5433:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-pgpkeygen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:-pgpkeygen}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pgpkeygen -d pgpkeygen"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 3s
       retries: 10
