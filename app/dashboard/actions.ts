@@ -7,6 +7,7 @@ import { auth, signOut } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
 import { logAudit } from "@/lib/audit";
+import { escrowColumns } from "@/lib/escrow-storage";
 import { canCreateKey, parseMaxKeysPerUser } from "@/lib/key-quota";
 import { validateKeyMaterial } from "@/lib/pgp-validation";
 import { chooseRevocationCertificate } from "@/lib/revocation-policy";
@@ -16,6 +17,7 @@ export async function saveKey(input: {
   details: string | null;
   publicKey: string;
   privateKey: string;
+  escrow?: unknown;
 }): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -27,6 +29,7 @@ export async function saveKey(input: {
   }
 
   const metadata = await validateKeyMaterial(input.publicKey, input.privateKey);
+  const escrow = escrowColumns(input.escrow ?? null);
   const maxKeys = parseMaxKeysPerUser(process.env.MAX_KEYS_PER_USER);
 
   await db.transaction(async (tx) => {
@@ -52,6 +55,7 @@ export async function saveKey(input: {
       fingerprint: metadata.fingerprint,
       publicKey: input.publicKey,
       privateKey: input.privateKey,
+      ...escrow,
     });
   });
 
