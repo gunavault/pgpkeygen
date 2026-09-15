@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { login } from "./actions";
+import { LoginForm } from "./LoginForm";
 
 export default async function LoginPage({
   searchParams,
@@ -35,8 +35,7 @@ export default async function LoginPage({
             Generate, store and audit your PGP keys.
           </h1>
           <p className="text-[15px] m-0" style={{ color: "var(--color-neutral-700)" }}>
-            Keys are created in your browser. Passphrases are never stored — they are emailed once and
-            can&apos;t be recovered.
+            Keys are created in your browser. Passphrases stay client-side; optional recovery encrypts them in the browser before any recovery data is stored.
           </p>
         </div>
         <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--color-neutral-500)" }}>
@@ -45,57 +44,16 @@ export default async function LoginPage({
       </div>
 
       <div className="flex items-center justify-center p-8">
-        <form action={login} className="w-full flex flex-col gap-[18px]" style={{ maxWidth: 340 }}>
-          <div>
-            <h2 className="m-0" style={{ fontSize: 28, marginBottom: 4 }}>
-              Sign in
-            </h2>
-            <p className="text-sm m-0" style={{ color: "var(--color-neutral-600)" }}>
-              Access your key vault.
-            </p>
-          </div>
-
-          {registered && (
-            <p className="text-sm m-0" style={{ color: "var(--color-accent-700)" }}>
-              Account created. Sign in below.
-            </p>
-          )}
-          {error === "ratelimited" && (
-            <p className="text-sm m-0" style={{ color: "var(--color-accent-700)" }}>
-              Too many attempts. Try again in a few minutes.
-            </p>
-          )}
-          {error === "invalid" && (
-            <p className="text-sm m-0" style={{ color: "var(--color-accent-700)" }}>
-              Invalid email or password.
-            </p>
-          )}
-
-          <div className="field">
-            <label htmlFor="li-email">Email</label>
-            <input id="li-email" name="email" type="email" placeholder="you@example.com" required className="input" />
-          </div>
-          <div className="field">
-            <label htmlFor="li-pass">Password</label>
-            <input id="li-pass" name="password" type="password" placeholder="••••••••" required className="input" />
-          </div>
-
-          <button type="submit" className="btn btn-primary btn-block">
-            Sign in
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-            </svg>
-          </button>
-
+        <div className="w-full flex flex-col gap-[18px]" style={{ maxWidth: 340 }}>
+          <LoginForm initialError={error ?? null} registered={Boolean(registered)} />
           <div style={{ height: 2, background: "var(--color-divider)" }} />
-
           <p className="text-sm m-0" style={{ color: "var(--color-neutral-600)" }}>
             No account?{" "}
             <Link href="/register" className="lnk">
               Register
             </Link>
           </p>
-        </form>
+        </div>
       </div>
     </div>
   );

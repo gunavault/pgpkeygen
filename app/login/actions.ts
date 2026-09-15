@@ -1,7 +1,6 @@
 "use server";
 
 import { AuthError } from "next-auth";
-import { redirect } from "next/navigation";
 import { signIn } from "@/auth";
 import { normalizeEmail } from "@/lib/identity";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
@@ -11,7 +10,11 @@ const LOGIN_SOURCE_LIMIT = 30;
 const LOGIN_GLOBAL_LIMIT = 500;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
-export async function login(formData: FormData) {
+export type LoginResult =
+  | { ok: true }
+  | { ok: false; error: "invalid" | "ratelimited" };
+
+export async function login(formData: FormData): Promise<LoginResult> {
   const email = normalizeEmail(formData.get("email"));
   const password = String(formData.get("password") ?? "");
   const ip = await getClientIp();
@@ -23,18 +26,20 @@ export async function login(formData: FormData) {
     : false;
 
   if (globallyLimited || accountLimited || sourceLimited) {
-    redirect("/login?error=ratelimited");
+    return { ok: false, error: "ratelimited" };
   }
 
   try {
     await signIn("credentials", {
       email,
       password,
+      redirect: false,
       redirectTo: "/dashboard",
     });
+    return { ok: true };
   } catch (error) {
     if (error instanceof AuthError) {
-      redirect("/login?error=invalid");
+      return { ok: false, error: "invalid" };
     }
     throw error;
   }
