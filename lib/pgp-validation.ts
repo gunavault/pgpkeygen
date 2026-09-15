@@ -63,6 +63,6 @@ export async function validateKeyMaterial(
     fingerprint: publicFingerprint,
     ...identity,
     algorithm: describeAlgorithm(publicKey.getAlgorithmInfo()),
-    expiresAt: expiration === Infinity ? null : expiration,
+    expiresAt: expiration instanceof Date ? expiration : null,
   };
 }
