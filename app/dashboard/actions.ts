@@ -7,43 +7,40 @@ import { auth, signOut } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
 import { logAudit } from "@/lib/audit";
+import { validateKeyMaterial } from "@/lib/pgp-validation";
 import { chooseRevocationCertificate } from "@/lib/revocation-policy";
 
 export async function saveKey(input: {
   title: string;
   details: string | null;
-  name: string;
-  email: string;
-  algorithm: string;
-  expiresAt: string | null;
-  fingerprint: string;
   publicKey: string;
   privateKey: string;
 }): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  if (
-    !input.publicKey.includes("BEGIN PGP PUBLIC KEY") ||
-    !input.privateKey.includes("BEGIN PGP PRIVATE KEY")
-  ) {
-    throw new Error("Invalid key material");
+  const title = input.title.trim();
+  const details = input.details?.trim() || null;
+  if (!title || title.length > 255 || (details?.length ?? 0) > 4_000) {
+    throw new Error("Invalid key metadata");
   }
+
+  const metadata = await validateKeyMaterial(input.publicKey, input.privateKey);
 
   await db.insert(pgpKeys).values({
     userId: session.user.id,
-    title: input.title,
-    details: input.details,
-    name: input.name,
-    email: input.email,
-    algorithm: input.algorithm,
-    expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
-    fingerprint: input.fingerprint,
+    title,
+    details,
+    name: metadata.name,
+    email: metadata.email,
+    algorithm: metadata.algorithm,
+    expiresAt: metadata.expiresAt,
+    fingerprint: metadata.fingerprint,
     publicKey: input.publicKey,
     privateKey: input.privateKey,
   });
 
-  await logAudit(session.user.email!, "key.generated", input.title, `fingerprint: ${input.fingerprint}`);
+  await logAudit(session.user.email!, "key.generated", title, `fingerprint: ${metadata.fingerprint}`);
 
   revalidatePath("/dashboard");
 }
