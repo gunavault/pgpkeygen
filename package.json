@@ -10,7 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:coverage": "node --experimental-strip-types --experimental-test-coverage --test tests/*.test.ts",
-    "audit:deps": "pnpm audit --audit-level critical",
+    "audit:deps": "pnpm audit --audit-level high",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm audit:deps && pnpm build",
     "admin:promote": "node scripts/promote-admin.mjs",
     "db:generate": "drizzle-kit generate",
@@ -24,13 +24,11 @@
     "next-auth": "5.0.0-beta.32",
     "drizzle-orm": "0.45.2",
     "pg": "^8.13.1",
-    "openpgp": "^6.3.1",
-    "nodemailer": "^9.1.0"
+    "openpgp": "^6.3.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
-    "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.11.10",
     "@types/react": "^19",
     "@types/react-dom": "^19",
