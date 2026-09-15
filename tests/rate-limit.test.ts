@@ -4,8 +4,7 @@ import test from "node:test";
 import { FixedWindowRateLimiter } from "../lib/rate-limit-core.ts";
 
 test("allows requests through the configured limit and blocks the next one", () => {
-  let now = 1_000;
-  const limiter = new FixedWindowRateLimiter(() => now);
+  const limiter = new FixedWindowRateLimiter(() => 1_000);
 
   assert.equal(limiter.isLimited("login:user", 2, 60_000), false);
   assert.equal(limiter.isLimited("login:user", 2, 60_000), false);
