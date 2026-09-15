@@ -5,21 +5,30 @@ import { redirect } from "next/navigation";
 import { signIn } from "@/auth";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 
-const LOGIN_LIMIT = 5;
+const LOGIN_ACCOUNT_LIMIT = 5;
+const LOGIN_SOURCE_LIMIT = 30;
+const LOGIN_GLOBAL_LIMIT = 500;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
   const ip = await getClientIp();
 
-  if (isRateLimited(`login:${ip}:${email}`, LOGIN_LIMIT, LOGIN_WINDOW_MS)) {
+  const globallyLimited = isRateLimited("login:global", LOGIN_GLOBAL_LIMIT, LOGIN_WINDOW_MS);
+  const accountLimited = isRateLimited(`login:account:${email}`, LOGIN_ACCOUNT_LIMIT, LOGIN_WINDOW_MS);
+  const sourceLimited = ip
+    ? isRateLimited(`login:source:${ip}`, LOGIN_SOURCE_LIMIT, LOGIN_WINDOW_MS)
+    : false;
+
+  if (globallyLimited || accountLimited || sourceLimited) {
     redirect("/login?error=ratelimited");
   }
 
   try {
     await signIn("credentials", {
-      email: formData.get("email"),
-      password: formData.get("password"),
+      email,
+      password,
       redirectTo: "/dashboard",
     });
   } catch (error) {
