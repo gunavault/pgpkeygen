@@ -36,6 +36,18 @@ export async function getVaultEnvelope() {
   return vaultEnvelopeFromRow(row);
 }
 
+export async function getVaultContext() {
+  const userId = await authenticatedUserId();
+  const [row] = await db
+    .select(envelopeProjection)
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!row) throw new Error("Account not found");
+  return { userId, envelope: vaultEnvelopeFromRow(row) };
+}
+
 export async function initializeVaultEnvelope(input: unknown) {
   const userId = await authenticatedUserId();
   const values = vaultEnvelopeColumns(input);
@@ -103,9 +115,6 @@ export async function getKeyEscrow(keyId: string) {
   return {
     envelope,
     payload,
-    context: {
-      userId,
-      fingerprint: key.fingerprint,
-    },
+    context: { userId, fingerprint: key.fingerprint },
   };
 }
