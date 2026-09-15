@@ -1,5 +1,5 @@
-import { parseEscrowPayloadInput, parseVaultEnvelopeInput } from "./escrow-record";
-import type { EscrowPayload, VaultEnvelope } from "./vault-escrow";
+import { parseEscrowPayloadInput, parseVaultEnvelopeInput } from "./escrow-record.ts";
+import type { EscrowPayload, VaultEnvelope } from "./vault-escrow.ts";
 
 export type VaultEnvelopeRow = {
   vaultWrappedKey: string | null;
