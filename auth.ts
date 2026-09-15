@@ -21,7 +21,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!email || !password) return null;
 
         const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-        if (!user || !verifyPassword(password, user.passwordHash)) {
+        if (!user || !(await verifyPassword(password, user.passwordHash))) {
           await logAudit(email, "login.failed");
           return null;
         }
