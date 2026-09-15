@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   createVaultEnvelope,
+  rewrapVaultEnvelope,
   unwrapVaultEnvelope,
   wrapEscrowSecret,
   unwrapEscrowSecret,
@@ -38,6 +39,23 @@ test("new vault envelopes use independent salt and IV values", async () => {
 
   assert.notEqual(first.envelope.salt, second.envelope.salt);
   assert.notEqual(first.envelope.iv, second.envelope.iv);
+});
+
+test("password rotation rewraps the same vault key under the new password", async () => {
+  const { envelope, vaultKey } = await createVaultEnvelope("old account password");
+  const rotated = await rewrapVaultEnvelope(
+    "old account password",
+    "new account password",
+    envelope,
+  );
+
+  await assert.rejects(
+    unwrapVaultEnvelope("old account password", rotated),
+    /unable to unlock vault/i,
+  );
+  assert.deepEqual(await unwrapVaultEnvelope("new account password", rotated), vaultKey);
+  assert.notEqual(rotated.salt, envelope.salt);
+  assert.notEqual(rotated.iv, envelope.iv);
 });
 
 test("escrowed secret round-trips under the random vault key", async () => {
