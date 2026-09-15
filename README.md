@@ -22,7 +22,11 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Key secret model
 
-OpenPGP keys are generated in the browser. Private-key passphrases stay in the browser and are never accepted by the application server or sent by email. Before encrypted private-key material is persisted, the UI requires the user to confirm that the passphrase has been copied or stored safely. There is no server-side passphrase recovery path. See `docs/key-secret-model.md` for the trust boundary.
+OpenPGP keys are generated in the browser. Private-key passphrase plaintext is never accepted by the key-persistence server action or sent by email.
+
+Passphrase recovery is **opt-in per key and defaults off**. In the default strict mode, the user must keep an independent copy before the encrypted private key is persisted. When recovery is explicitly enabled, the browser encrypts a recovery copy under the user's client-side vault and only opaque ciphertext is stored. Reveal re-prompts for the account password and decrypts locally.
+
+Enabling recovery changes the threat model: a stolen database contains material that can be used for offline guessing against the account password. The UI warns about that tradeoff at the opt-in control. See `docs/key-secret-model.md` and `docs/passphrase-recovery.md` for the trust boundary and recovery design.
 
 ## Deploying with Docker
 
@@ -112,7 +116,7 @@ To learn more about Next.js, take a look at the following resources:
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+You can check out the [Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
 ## Deploy on Vercel
 
