@@ -53,7 +53,23 @@ Environment variables the image reads:
 | `POSTGRES_PASSWORD` | with Compose | Database password. Compose refuses to start without it. Use a strong URL-safe value such as `openssl rand -hex 32`. |
 | `POSTGRES_DB` | with Compose | Database name. Defaults to `pgpkeygen`. |
 | `AUTH_TRUST_HOST` | set to `true` in the image | Lets Auth.js trust the `Host` header behind a reverse proxy. Set `AUTH_URL` to your public URL instead if you prefer an explicit origin. |
-| `ADMIN_EMAILS` | no | Comma-separated emails that get the admin role when they register. |
+
+### Provisioning an administrator
+
+Public registration always creates a normal `user` account. An email address is
+not proof of ownership, so privileged roles are never derived from a submitted
+registration email.
+
+After the intended administrator has registered, an operator with database
+access can explicitly promote that existing account:
+
+```bash
+DATABASE_URL=postgres://... pnpm admin:promote -- admin@example.com
+```
+
+The command fails unless exactly one existing account matches the normalized
+email. Run it only from a trusted operator environment. There is no
+`ADMIN_EMAILS` self-registration shortcut.
 
 For local development that needs Postgres reachable from the host, opt in to the
 development override. It binds only to loopback:
@@ -100,6 +116,6 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The easiest way to deploy a Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_source=create-next-app&utm_campaign=create-next-app-readme).
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
