@@ -67,6 +67,15 @@ test("escrowed secret round-trips under the random vault key", async () => {
   assert.equal(wrapped.version, 1);
 });
 
+test("escrow wrapping rejects plaintext that cannot fit the bounded server record", async () => {
+  const { vaultKey } = await createVaultEnvelope("correct password");
+
+  await assert.rejects(
+    wrapEscrowSecret(vaultKey, "a".repeat(4_081), CONTEXT),
+    /secret is too large/i,
+  );
+});
+
 test("AAD binding rejects ciphertext transplanted to another key or user", async () => {
   const { vaultKey } = await createVaultEnvelope("correct password");
   const wrapped = await wrapEscrowSecret(vaultKey, "pgp-key-passphrase", CONTEXT);
