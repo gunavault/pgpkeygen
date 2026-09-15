@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { getKeyEscrow } from "@/app/escrow/actions";
 import {
   deleteKey,
   forgetLegacyRevocationCertificate,
   getLegacyRevocationCertificate,
   revokeKey,
 } from "./actions";
+import { LocalRecoveryPrompt } from "./LocalRecoveryPrompt";
+
+type RecoveryRecord = NonNullable<Awaited<ReturnType<typeof getKeyEscrow>>>;
 
 export function KeyActions({
   keyId,
@@ -24,6 +28,23 @@ export function KeyActions({
   const [showRevoke, setShowRevoke] = useState(false);
   const [certificate, setCertificate] = useState("");
   const [legacyExported, setLegacyExported] = useState(false);
+  const [recoveryRecord, setRecoveryRecord] = useState<RecoveryRecord | null>(null);
+
+  function handleLoadRecovery() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const record = await getKeyEscrow(keyId);
+        if (!record) {
+          setError("No encrypted recovery copy is stored for this key.");
+          return;
+        }
+        setRecoveryRecord(record);
+      } catch {
+        setError("Failed to load the encrypted recovery copy.");
+      }
+    });
+  }
 
   function handleRevoke() {
     if (!confirm("Revoke this key? This cannot be undone.")) return;
@@ -89,7 +110,11 @@ export function KeyActions({
             Revoke
           </button>
         )}
-        {hasEscrow && <span className="text-muted">Encrypted recovery available</span>}
+        {hasEscrow && !recoveryRecord && (
+          <button type="button" onClick={handleLoadRecovery} disabled={pending} className="lnk disabled:opacity-50">
+            Reveal recovered passphrase
+          </button>
+        )}
         {hasLegacyCertificate && (
           <button type="button" onClick={handleLoadLegacy} disabled={pending} className="lnk disabled:opacity-50">
             Export legacy revocation certificate
@@ -104,6 +129,10 @@ export function KeyActions({
           Delete
         </button>
       </div>
+
+      {recoveryRecord && (
+        <LocalRecoveryPrompt record={recoveryRecord} onClose={() => setRecoveryRecord(null)} />
+      )}
 
       {!isRevoked && showRevoke && (
         <div className="flex flex-col gap-2 max-w-2xl">
