@@ -4,6 +4,7 @@ import test from "node:test";
 
 const generateForm = readFileSync(new URL("../app/dashboard/GenerateKeyForm.tsx", import.meta.url), "utf8");
 const keyActions = readFileSync(new URL("../app/dashboard/KeyActions.tsx", import.meta.url), "utf8");
+const recoveryPrompt = readFileSync(new URL("../app/dashboard/LocalRecoveryPrompt.tsx", import.meta.url), "utf8");
 const dashboardPage = readFileSync(new URL("../app/dashboard/page.tsx", import.meta.url), "utf8");
 
 test("passphrase recovery is explicit opt-in and defaults off", () => {
@@ -24,10 +25,10 @@ test("opt-out keys expose no reveal affordance", () => {
   assert.match(keyActions, /hasEscrow\s*&&/);
 });
 
-test("reveal explicitly re-prompts and decrypts with the submitted password", () => {
-  assert.match(keyActions, /type="password"/);
+test("reveal fetches opaque data before a network-blind local password prompt", () => {
   assert.match(keyActions, /getKeyEscrow/);
-  assert.match(keyActions, /unwrapVaultEnvelope/);
-  assert.match(keyActions, /unwrapEscrowSecret/);
-  assert.doesNotMatch(keyActions, /useVault/);
+  assert.match(recoveryPrompt, /type="password"/);
+  assert.match(recoveryPrompt, /unwrapVaultEnvelope/);
+  assert.match(recoveryPrompt, /unwrapEscrowSecret/);
+  assert.doesNotMatch(recoveryPrompt, /getKeyEscrow|useVault|server action/i);
 });
