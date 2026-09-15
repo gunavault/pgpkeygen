@@ -35,7 +35,9 @@ pnpm check
 
 CI runs lint, TypeScript checking, tests, dependency auditing, and the production build on every push and pull request.
 
-The initial dependency-audit gate fails on **critical** advisories. Existing lower-severity findings remain visible in audit output and must be tracked rather than silently forgotten. Issue #13 tracks upgrading Nodemailer and tightening the policy after the known dependency debt is removed; lowering the threshold to hide a newly introduced critical advisory is not acceptable.
+The dependency-audit gate fails on **high** and **critical** advisories. Lower-severity findings remain visible in audit output and must be tracked rather than silently ignored. The remaining known moderate advisory is the development-tool-only `esbuild` path through current stable `drizzle-kit` / `@esbuild-kit`; issue #13 documents its scope and requires a recheck no later than 2026-10-15. Once that upstream dependency path is remediated, the audit threshold should be tightened to **moderate**.
+
+Do not weaken the audit threshold to make a newly introduced advisory pass. Dependency exceptions must be explicit, scoped, time-bounded, and removed when the upstream constraint is resolved.
 
 ## What should be tested first
 
@@ -47,13 +49,13 @@ Prioritize tests around trust boundaries and irreversible behavior:
 - PGP key parsing, metadata validation, revocation, and deletion;
 - user ownership boundaries;
 - server actions receiving security-sensitive input;
-- SMTP/passphrase behavior while that feature exists;
+- browser/server secret-boundary behavior;
 - database/deployment security invariants where they can be validated automatically.
 
 Tests must use synthetic identities, keys, and credentials. Never commit a real private key, passphrase, SMTP credential, production database URL, or personal data as test material.
 
 ## Current foundation
 
-The initial suite covers password hashing/verification and the fixed-window rate-limit state machine. The limiter's clock is injected deliberately so future security changes can start with deterministic failing tests instead of framework mocks.
+The initial suite covers password hashing/verification and the fixed-window rate-limit state machine, and subsequent security fixes extend that baseline with focused regression tests. The limiter's clock is injected deliberately so future security changes can start with deterministic failing tests instead of framework mocks.
 
-Issue #12 tracks expansion of this baseline, and security findings should add focused regression coverage as they are addressed.
+Security findings should continue to add focused regression coverage as they are addressed.
