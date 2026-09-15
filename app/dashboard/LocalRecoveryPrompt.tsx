@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import type { EscrowContext, EscrowPayload, VaultEnvelope } from "@/lib/vault-escrow";
 import { unwrapEscrowSecret, unwrapVaultEnvelope } from "@/lib/vault-escrow";
 import { CopyButton } from "./CopyButton";
@@ -18,6 +18,9 @@ export function LocalRecoveryPrompt({
   record: RecoveryRecord;
   onClose: () => void;
 }) {
+  const fieldId = useId();
+  const passwordId = `${fieldId}-account-password`;
+  const recoveredId = `${fieldId}-recovered-passphrase`;
   const [pending, startTransition] = useTransition();
   const [accountPassword, setAccountPassword] = useState("");
   const [recoveredSecret, setRecoveredSecret] = useState("");
@@ -56,11 +59,11 @@ export function LocalRecoveryPrompt({
 
   return (
     <div className="flex flex-col gap-2 max-w-xl">
-      <label htmlFor="recovery-account-password" className="text-muted">
+      <label htmlFor={passwordId} className="text-muted">
         Re-enter your account password. It is used only in this browser to unlock the encrypted recovery copy.
       </label>
       <input
-        id="recovery-account-password"
+        id={passwordId}
         type="password"
         autoComplete="current-password"
         value={accountPassword}
@@ -78,9 +81,9 @@ export function LocalRecoveryPrompt({
 
       {recoveredSecret && (
         <div className="field mt-2">
-          <label htmlFor="recovered-passphrase">Recovered passphrase</label>
+          <label htmlFor={recoveredId}>Recovered passphrase</label>
           <div className="flex gap-2 items-center">
-            <input id="recovered-passphrase" value={recoveredSecret} readOnly className="input mono flex-1" />
+            <input id={recoveredId} value={recoveredSecret} readOnly className="input mono flex-1" />
             <CopyButton text={recoveredSecret} />
             <button type="button" className="btn btn-secondary" onClick={() => setRecoveredSecret("")}>Hide</button>
           </div>
