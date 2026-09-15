@@ -7,7 +7,6 @@ import { auth, signOut } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
 import { logAudit } from "@/lib/audit";
-import { sendPassphraseEmail } from "@/lib/mail";
 
 export async function saveKey(input: {
   title: string;
@@ -20,8 +19,7 @@ export async function saveKey(input: {
   publicKey: string;
   privateKey: string;
   revocationCertificate: string;
-  passphrase: string;
-}): Promise<{ emailSent: boolean }> {
+}): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -46,17 +44,9 @@ export async function saveKey(input: {
     revocationCertificate: input.revocationCertificate,
   });
 
-  const emailSent = await sendPassphraseEmail(session.user.email!, input.title, input.passphrase);
-
-  await logAudit(
-    session.user.email!,
-    "key.generated",
-    input.title,
-    `fingerprint: ${input.fingerprint}; passphrase emailed: ${emailSent}`,
-  );
+  await logAudit(session.user.email!, "key.generated", input.title, `fingerprint: ${input.fingerprint}`);
 
   revalidatePath("/dashboard");
-  return { emailSent };
 }
 
 export async function deleteKey(keyId: string) {

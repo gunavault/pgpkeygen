@@ -20,6 +20,10 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Key secret model
+
+OpenPGP keys are generated in the browser. Private-key passphrases stay in the browser and are never accepted by the application server or sent by email. Before encrypted private-key material is persisted, the UI requires the user to confirm that the passphrase has been copied or stored safely. There is no server-side passphrase recovery path. See `docs/key-secret-model.md` for the trust boundary.
+
 ## Deploying with Docker
 
 The repo ships a multi-stage `Dockerfile` that builds a self-contained Next.js
@@ -50,7 +54,6 @@ Environment variables the image reads:
 | `POSTGRES_DB` | with Compose | Database name. Defaults to `pgpkeygen`. |
 | `AUTH_TRUST_HOST` | set to `true` in the image | Lets Auth.js trust the `Host` header behind a reverse proxy. Set `AUTH_URL` to your public URL instead if you prefer an explicit origin. |
 | `ADMIN_EMAILS` | no | Comma-separated emails that get the admin role when they register. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | no | Passphrase emails. Skipped when `SMTP_HOST` is empty. |
 
 For local development that needs Postgres reachable from the host, opt in to the
 development override. It binds only to loopback:
