@@ -11,6 +11,8 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env (see .env.example)}
       # Trust X-Forwarded-For only when a sanitizing reverse proxy is the sole ingress.
       TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+      # Bound per-user stored key count.
+      MAX_KEYS_PER_USER: ${MAX_KEYS_PER_USER:-50}
     depends_on:
       db:
         condition: service_healthy
