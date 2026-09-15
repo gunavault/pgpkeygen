@@ -29,3 +29,22 @@ test("starts a fresh window after the current window expires", () => {
   now = 2_001;
   assert.equal(limiter.isLimited("register:ip", 1, 1_000), false);
 });
+
+test("fails closed when the bounded key store is full", () => {
+  const limiter = new FixedWindowRateLimiter(() => 1_000, 2);
+
+  assert.equal(limiter.isLimited("a", 10, 60_000), false);
+  assert.equal(limiter.isLimited("b", 10, 60_000), false);
+  assert.equal(limiter.isLimited("c", 10, 60_000), true);
+  assert.equal(limiter.size, 2);
+});
+
+test("expired entries are reclaimed before rejecting a new key", () => {
+  let now = 1_000;
+  const limiter = new FixedWindowRateLimiter(() => now, 1);
+
+  assert.equal(limiter.isLimited("old", 10, 100), false);
+  now = 1_101;
+  assert.equal(limiter.isLimited("new", 10, 100), false);
+  assert.equal(limiter.size, 1);
+});
