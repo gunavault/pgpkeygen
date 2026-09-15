@@ -69,6 +69,11 @@ export default async function RegisterPage({
               Enter a valid email and a password (8+ chars).
             </p>
           )}
+          {error === "server" && (
+            <p className="text-sm m-0" style={{ color: "var(--color-accent-700)" }}>
+              Registration could not be completed. Please try again later.
+            </p>
+          )}
 
           <div className="field">
             <label htmlFor="re-email">Email</label>

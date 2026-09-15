@@ -3,17 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import * as openpgp from "openpgp";
+import { generatePassphrase } from "@/lib/passphrase";
 import { CopyButton } from "./CopyButton";
 import { saveKey } from "./actions";
-
-const PASSPHRASE_CHARS =
-  "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_";
-
-function generatePassphrase(length = 24) {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => PASSPHRASE_CHARS[b % PASSPHRASE_CHARS.length]).join("");
-}
 
 const ALGORITHMS = {
   curve25519: { label: "ECC (Curve25519) — recommended", genOptions: { type: "curve25519" as const } },
