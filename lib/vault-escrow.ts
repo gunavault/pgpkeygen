@@ -7,7 +7,10 @@ const PBKDF2_ITERATIONS = 600_000;
 const VAULT_KEY_BYTES = 32;
 const SALT_BYTES = 16;
 const GCM_IV_BYTES = 12;
-const VAULT_CIPHERTEXT_BYTES = VAULT_KEY_BYTES + 16; // AES-GCM authentication tag.
+const GCM_TAG_BYTES = 16;
+const VAULT_CIPHERTEXT_BYTES = VAULT_KEY_BYTES + GCM_TAG_BYTES;
+const MAX_ESCROW_CIPHERTEXT_BYTES = 4_096;
+const MAX_ESCROW_SECRET_BYTES = MAX_ESCROW_CIPHERTEXT_BYTES - GCM_TAG_BYTES;
 
 export type VaultEnvelope = {
   version: typeof VAULT_ENVELOPE_VERSION;
@@ -191,7 +194,11 @@ export async function rewrapVaultEnvelope(
   envelope: VaultEnvelope,
 ): Promise<VaultEnvelope> {
   const vaultKey = await unwrapVaultEnvelope(oldPassword, envelope);
-  return wrapVaultKey(newPassword, vaultKey);
+  try {
+    return await wrapVaultKey(newPassword, vaultKey);
+  } finally {
+    vaultKey.fill(0);
+  }
 }
 
 export async function wrapEscrowSecret(
@@ -200,6 +207,11 @@ export async function wrapEscrowSecret(
   context: EscrowContext,
 ): Promise<EscrowPayload> {
   if (!secret) throw new Error("Secret is required");
+  const encodedSecret = encoder.encode(secret);
+  if (encodedSecret.length > MAX_ESCROW_SECRET_BYTES) {
+    throw new Error("Secret is too large for escrow");
+  }
+
   const iv = randomBytes(GCM_IV_BYTES);
   const key = await importAesKey(vaultKey);
   const aad = aadFor(context);
@@ -211,7 +223,7 @@ export async function wrapEscrowSecret(
         additionalData: toArrayBuffer(aad),
       },
       key,
-      toArrayBuffer(encoder.encode(secret)),
+      toArrayBuffer(encodedSecret),
     ),
   );
 
@@ -231,7 +243,11 @@ export async function unwrapEscrowSecret(
     if (payload.version !== ESCROW_VERSION) throw new Error("Unsupported escrow payload");
     const iv = base64ToBytes(payload.iv);
     const ciphertext = base64ToBytes(payload.ciphertext);
-    if (iv.length !== GCM_IV_BYTES || ciphertext.length < 17) {
+    if (
+      iv.length !== GCM_IV_BYTES ||
+      ciphertext.length < GCM_TAG_BYTES + 1 ||
+      ciphertext.length > MAX_ESCROW_CIPHERTEXT_BYTES
+    ) {
       throw new Error("Invalid escrow payload");
     }
 
