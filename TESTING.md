@@ -23,7 +23,7 @@ pnpm test
 pnpm test:coverage
 pnpm typecheck
 pnpm lint
-pnpm audit
+pnpm audit:deps
 pnpm build
 ```
 
@@ -35,7 +35,7 @@ pnpm check
 
 CI runs lint, TypeScript checking, tests, dependency auditing, and the production build on every push and pull request.
 
-The initial dependency-audit gate fails on **critical** advisories. Issue #13 tracks upgrading Nodemailer and tightening the policy after the known dependency debt is removed; lowering the threshold to hide a newly introduced critical advisory is not acceptable.
+The initial dependency-audit gate fails on **critical** advisories. Existing lower-severity findings remain visible in audit output and must be tracked rather than silently forgotten. Issue #13 tracks upgrading Nodemailer and tightening the policy after the known dependency debt is removed; lowering the threshold to hide a newly introduced critical advisory is not acceptable.
 
 ## What should be tested first
 
