@@ -3,8 +3,10 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
+import { filterKeys, normalizeQuery, parseKeyStatusFilter } from "@/lib/key-filter";
 import { CopyButton } from "./CopyButton";
 import { KeyActions } from "./KeyActions";
+import { KeyFilter } from "./KeyFilter";
 
 function fingerprintPretty(fp: string) {
   return (fp.match(/.{1,4}/g) || []).join(" ");
@@ -12,15 +14,24 @@ function fingerprintPretty(fp: string) {
 
 const kicker = { fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase" as const, color: "var(--color-neutral-500)" };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const session = await auth();
   const userId = session!.user.id;
+  const params = await searchParams;
+  const query = normalizeQuery(params.q);
+  const status = parseKeyStatusFilter(params.status);
 
   const keys = await db
     .select()
     .from(pgpKeys)
     .where(eq(pgpKeys.userId, userId))
     .orderBy(desc(pgpKeys.createdAt));
+
+  const visibleKeys = filterKeys(keys, { query, status });
 
   return (
     <div className="flex flex-col gap-5">
@@ -37,11 +48,24 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
+      {keys.length > 0 && (
+        <KeyFilter query={query} status={status} shown={visibleKeys.length} total={keys.length} />
+      )}
+
       {keys.length === 0 && <p className="text-sm text-muted">No keys yet.</p>}
 
-      {keys.length > 0 && (
+      {keys.length > 0 && visibleKeys.length === 0 && (
+        <p className="text-sm text-muted">
+          No keys match your filters.{" "}
+          <Link href="/dashboard" className="lnk">
+            Clear filters
+          </Link>
+        </p>
+      )}
+
+      {visibleKeys.length > 0 && (
         <div style={{ border: "1px solid var(--color-divider)" }}>
-          {keys.map((key, i) => (
+          {visibleKeys.map((key, i) => (
             <details key={key.id} style={{ borderTop: i === 0 ? "none" : "1px solid var(--color-divider)" }}>
               <summary className="keyrow flex items-center gap-3 cursor-pointer px-4 py-3.5">
                 <span className="text-[14.5px] font-bold" style={{ fontFamily: "var(--font-heading)" }}>
