@@ -4,11 +4,11 @@ import * as openpgp from "openpgp";
 
 import { validateKeyMaterial } from "../lib/pgp-validation.ts";
 
-async function generate(passphrase: string | undefined = "strong-test-passphrase") {
+async function generate(passphrase: string | null = "strong-test-passphrase") {
   return openpgp.generateKey({
     type: "curve25519",
     userIDs: [{ name: "Ada Lovelace", email: "ada@example.com" }],
-    passphrase,
+    ...(passphrase === null ? {} : { passphrase }),
     keyExpirationTime: 3600,
     format: "armored",
   });
@@ -37,7 +37,7 @@ test("rejects a private key that does not match the public key", async () => {
 });
 
 test("rejects unencrypted private-key material", async () => {
-  const generated = await generate(undefined);
+  const generated = await generate(null);
   await assert.rejects(
     validateKeyMaterial(generated.publicKey, generated.privateKey),
     /encrypted/i,
