@@ -1,22 +1,35 @@
 # Key secret model
 
-PGPKeyGen generates OpenPGP key pairs in the user's browser. The private key is encrypted with the user's passphrase before any key material is sent to the application server.
+PGPKeyGen generates OpenPGP key pairs in the user's browser. The private key is encrypted before key material is sent to the application server.
 
-## Passphrases are local-only
+## Strict mode remains the default
 
-The private-key passphrase is never accepted by a server action, persisted in the database, logged, or sent through SMTP. There is no passphrase recovery service.
+Passphrase recovery is optional per key and defaults to off. When recovery is not enabled, the private-key passphrase stays independent of the application database. The user must keep an external copy, and the key has no reveal action in the application.
 
-The generation flow intentionally separates generation from persistence:
+The strict generation flow continues to require the user to acknowledge that the passphrase and revocation certificate have been saved before the encrypted key is persisted.
 
-1. the browser generates the key pair and revocation certificate;
-2. the UI displays the passphrase and asks the user to copy/store it;
-3. the user must explicitly confirm that the passphrase is safely stored;
-4. only then does the browser send the encrypted private key, public key, revocation material, and non-secret metadata to the server.
+## Optional client-side recovery
 
-If the user navigates away before step 4, no vault record has been created. This prevents the application from persisting a key that the user has not acknowledged being able to decrypt.
+A user may explicitly enable encrypted passphrase recovery for an individual key. Recovery encryption and decryption happen in the browser; the key-persistence server action receives only a bounded opaque recovery record, never the plaintext private-key passphrase.
+
+The recovery design uses a random per-user vault key protected by a separate account-password-derived envelope. The vault key is kept only in browser memory and is not persisted in browser storage or transmitted to the server. Each opted-in key uses a fresh authenticated-encryption IV.
+
+Per-key recovery ciphertext is authenticated with additional data that includes the authenticated user identity and PGP fingerprint. This binding prevents copying a recovery ciphertext to another key or user record and treating it as valid recovery material.
+
+Reveal is shown only for keys that contain recovery ciphertext. It always asks for the account password again and performs the unlock locally. A wrong password fails authenticated decryption without returning partial plaintext.
+
+See `docs/passphrase-recovery.md` for the envelope format, password-rotation rule, AAD rationale, and detailed threat model.
+
+## Security tradeoff
+
+Recovery changes the compromise model. With recovery disabled, a database copy of an encrypted private key still requires the independently kept private-key passphrase. With recovery enabled, stored recovery material allows offline guessing against the account password.
+
+For that reason the UI states the cost next to the opt-in control: enabling recovery makes account-password strength a single point of failure for that key's confidentiality. The strict no-recovery behavior remains available and remains the default.
+
+Optional recovery does not claim to protect against a fully compromised application server or an XSS attacker active while the user unlocks recovery.
 
 ## Server trust boundary
 
-A compromised application server or SMTP service should not gain the passphrase from normal application traffic. A database compromise can expose the encrypted armored private key and other stored metadata, but recovering the private key still requires the user's independently stored passphrase.
+`tests/passphrase-boundary.test.ts` remains the regression guard for the server boundary and is intentionally unchanged. Passphrase plaintext must not be accepted by `app/dashboard/actions.ts`, persisted in the database, logged, or sent through email.
 
-Revocation-certificate storage is a separate security boundary tracked independently because possession of a revocation certificate can permanently revoke the corresponding key even without the private-key passphrase.
+Revocation certificates remain a separate security boundary. New revocation certificates stay client-held under the existing revocation model.
