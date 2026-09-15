@@ -6,15 +6,11 @@ import { users } from "@/lib/db/schema";
 import { hashPassword } from "@/lib/password";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { roleForSelfRegistration } from "@/lib/registration-policy";
 
 const REGISTER_SOURCE_LIMIT = 10;
 const REGISTER_GLOBAL_LIMIT = 100;
 const REGISTER_WINDOW_MS = 60 * 60 * 1000;
-
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
 
 export async function register(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -34,7 +30,7 @@ export async function register(formData: FormData) {
     redirect("/register?error=invalid");
   }
 
-  const role = ADMIN_EMAILS.includes(email) ? "admin" : "user";
+  const role = roleForSelfRegistration(email);
 
   try {
     await db.insert(users).values({ email, passwordHash: await hashPassword(password), role });
@@ -42,7 +38,7 @@ export async function register(formData: FormData) {
     redirect("/register?error=exists");
   }
 
-  await logAudit(email, "user.registered", undefined, role === "admin" ? "role: admin" : undefined);
+  await logAudit(email, "user.registered");
 
   redirect("/login?registered=1");
 }

@@ -12,6 +12,7 @@
     "test:coverage": "node --experimental-strip-types --experimental-test-coverage --test tests/*.test.ts",
     "audit:deps": "pnpm audit --audit-level critical",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm audit:deps && pnpm build",
+    "admin:promote": "node scripts/promote-admin.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
