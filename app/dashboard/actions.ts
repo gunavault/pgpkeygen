@@ -7,6 +7,7 @@ import { auth, signOut } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
 import { logAudit } from "@/lib/audit";
+import { chooseRevocationCertificate } from "@/lib/revocation-policy";
 
 export async function saveKey(input: {
   title: string;
@@ -18,7 +19,6 @@ export async function saveKey(input: {
   fingerprint: string;
   publicKey: string;
   privateKey: string;
-  revocationCertificate: string;
 }): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -41,10 +41,35 @@ export async function saveKey(input: {
     fingerprint: input.fingerprint,
     publicKey: input.publicKey,
     privateKey: input.privateKey,
-    revocationCertificate: input.revocationCertificate,
   });
 
   await logAudit(session.user.email!, "key.generated", input.title, `fingerprint: ${input.fingerprint}`);
+
+  revalidatePath("/dashboard");
+}
+
+export async function getLegacyRevocationCertificate(keyId: string): Promise<string | null> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const [key] = await db
+    .select({ revocationCertificate: pgpKeys.revocationCertificate })
+    .from(pgpKeys)
+    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, session.user.id)))
+    .limit(1);
+
+  if (!key) throw new Error("Not found");
+  return key.revocationCertificate;
+}
+
+export async function forgetLegacyRevocationCertificate(keyId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  await db
+    .update(pgpKeys)
+    .set({ revocationCertificate: null })
+    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, session.user.id)));
 
   revalidatePath("/dashboard");
 }
@@ -65,7 +90,7 @@ export async function deleteKey(keyId: string) {
   revalidatePath("/dashboard");
 }
 
-export async function revokeKey(keyId: string) {
+export async function revokeKey(keyId: string, suppliedCertificate: string | null) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -77,19 +102,21 @@ export async function revokeKey(keyId: string) {
 
   if (!key) throw new Error("Not found");
   if (key.revokedAt) return;
-  if (!key.revocationCertificate) {
-    throw new Error("No revocation certificate stored for this key");
-  }
+
+  const revocationCertificate = chooseRevocationCertificate(
+    suppliedCertificate,
+    key.revocationCertificate,
+  );
 
   const publicKeyObj = await openpgp.readKey({ armoredKey: key.publicKey });
   const { publicKey: revokedPublicKey } = await openpgp.revokeKey({
     key: publicKeyObj,
-    revocationCertificate: key.revocationCertificate,
+    revocationCertificate,
   });
 
   await db
     .update(pgpKeys)
-    .set({ publicKey: revokedPublicKey, revokedAt: new Date() })
+    .set({ publicKey: revokedPublicKey, revokedAt: new Date(), revocationCertificate: null })
     .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, session.user.id)));
 
   await logAudit(session.user.email!, "key.revoked", key.title, `fingerprint: ${key.fingerprint}`);
