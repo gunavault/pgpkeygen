@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { isUniqueViolation } from "@/lib/db-errors";
+import { normalizeEmail } from "@/lib/identity";
 import { hashPassword } from "@/lib/password";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
@@ -13,7 +15,7 @@ const REGISTER_GLOBAL_LIMIT = 100;
 const REGISTER_WINDOW_MS = 60 * 60 * 1000;
 
 export async function register(formData: FormData) {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = normalizeEmail(formData.get("email"));
   const password = String(formData.get("password") ?? "");
 
   const ip = await getClientIp();
@@ -34,8 +36,13 @@ export async function register(formData: FormData) {
 
   try {
     await db.insert(users).values({ email, passwordHash: await hashPassword(password), role });
-  } catch {
-    redirect("/register?error=exists");
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      redirect("/register?error=exists");
+    }
+
+    console.error("register: database operation failed");
+    redirect("/register?error=server");
   }
 
   await logAudit(email, "user.registered");
