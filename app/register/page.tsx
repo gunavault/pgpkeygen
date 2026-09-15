@@ -35,8 +35,7 @@ export default async function RegisterPage({
             Generate, store and audit your PGP keys.
           </h1>
           <p className="text-[15px] m-0" style={{ color: "var(--color-neutral-700)" }}>
-            Keys are created in your browser. Passphrases are never stored — they are emailed once and
-            can&apos;t be recovered.
+            Keys are created in your browser. Private-key passphrases never leave your browser and cannot be recovered by the server.
           </p>
         </div>
         <div style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--color-neutral-500)" }}>
