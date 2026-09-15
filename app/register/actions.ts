@@ -7,7 +7,8 @@ import { hashPassword } from "@/lib/password";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 
-const REGISTER_LIMIT = 5;
+const REGISTER_SOURCE_LIMIT = 10;
+const REGISTER_GLOBAL_LIMIT = 100;
 const REGISTER_WINDOW_MS = 60 * 60 * 1000;
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
@@ -20,7 +21,12 @@ export async function register(formData: FormData) {
   const password = String(formData.get("password") ?? "");
 
   const ip = await getClientIp();
-  if (isRateLimited(`register:${ip}`, REGISTER_LIMIT, REGISTER_WINDOW_MS)) {
+  const globallyLimited = isRateLimited("register:global", REGISTER_GLOBAL_LIMIT, REGISTER_WINDOW_MS);
+  const sourceLimited = ip
+    ? isRateLimited(`register:source:${ip}`, REGISTER_SOURCE_LIMIT, REGISTER_WINDOW_MS)
+    : false;
+
+  if (globallyLimited || sourceLimited) {
     redirect("/register?error=ratelimited");
   }
 
@@ -31,7 +37,7 @@ export async function register(formData: FormData) {
   const role = ADMIN_EMAILS.includes(email) ? "admin" : "user";
 
   try {
-    await db.insert(users).values({ email, passwordHash: hashPassword(password), role });
+    await db.insert(users).values({ email, passwordHash: await hashPassword(password), role });
   } catch {
     redirect("/register?error=exists");
   }
