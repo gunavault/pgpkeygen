@@ -1,13 +1,16 @@
 import { headers } from "next/headers";
+import { resolveClientIp } from "./client-ip";
 import { FixedWindowRateLimiter } from "./rate-limit-core";
 
-// ponytail: in-memory fixed-window limiter, single-process only.
-// Fine for a self-hosted internal app on one instance; move to Redis if you ever run more than one.
+// Process-local by design. A bounded store protects single-instance deployments
+// from unbounded attacker-controlled keys. Multi-replica deployments must use a
+// shared external limiter before scaling the app horizontally.
 const limiter = new FixedWindowRateLimiter();
 
-export async function getClientIp(): Promise<string> {
+export async function getClientIp(): Promise<string | null> {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const trustProxy = process.env.TRUST_PROXY_HEADERS === "true";
+  return resolveClientIp(h.get("x-forwarded-for"), trustProxy);
 }
 
 export function isRateLimited(key: string, limit: number, windowMs: number): boolean {
