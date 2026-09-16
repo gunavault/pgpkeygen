@@ -31,9 +31,7 @@ export default async function DashboardPage() {
         </div>
         <Link href="/dashboard/generate" className="btn btn-primary whitespace-nowrap">
           New key
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12h14" /><path d="M12 5v14" />
-          </svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
         </Link>
       </div>
 
@@ -46,6 +44,7 @@ export default async function DashboardPage() {
               <summary className="keyrow flex items-center gap-3 cursor-pointer px-4 py-3.5">
                 <span className="text-[14.5px] font-bold" style={{ fontFamily: "var(--font-heading)" }}>{key.title}</span>
                 {key.revokedAt && <span className="tag tag-accent" style={{ fontSize: 9.5 }}>Revoked</span>}
+                {key.escrowVersion && <span className="tag" style={{ fontSize: 9.5 }}>Recovery enabled</span>}
                 {key.revocationCertificate && <span className="tag" style={{ fontSize: 9.5 }}>Legacy revocation copy</span>}
                 <span className="mono text-xs ml-auto text-muted">{key.email}</span>
               </summary>
@@ -60,11 +59,10 @@ export default async function DashboardPage() {
                 </div>
 
                 <div className="mt-4"><div style={{ ...kicker, marginBottom: 8 }}>Fingerprint</div><div className="mono text-[13px] px-3.5 py-3" style={{ background: "var(--color-neutral-200)", border: "1px solid var(--color-divider)", letterSpacing: ".03em", wordBreak: "break-all" }}>{fingerprintPretty(key.fingerprint)}</div></div>
-
                 <div className="mt-4"><div className="flex items-center justify-between mb-2"><span style={kicker}>Public key</span><CopyButton text={key.publicKey} /></div><pre className="mono keyblock text-[11px] leading-[1.55] px-3.5 py-3 overflow-auto whitespace-pre-wrap m-0" style={{ background: "var(--color-neutral-200)", border: "1px solid var(--color-divider)", maxHeight: 150, wordBreak: "break-all" }}>{key.publicKey}</pre></div>
                 <div className="mt-4"><div className="flex items-center justify-between mb-2"><span style={kicker}>Private key</span><CopyButton text={key.privateKey} /></div><pre className="mono keyblock text-[11px] leading-[1.55] px-3.5 py-3 overflow-auto whitespace-pre-wrap m-0" style={{ background: "var(--color-neutral-900)", color: "var(--color-neutral-300)", border: "1px solid var(--color-neutral-900)", maxHeight: 150, wordBreak: "break-all" }}>{key.privateKey}</pre></div>
 
-                <KeyActions keyId={key.id} isRevoked={!!key.revokedAt} hasLegacyCertificate={!!key.revocationCertificate} />
+                <KeyActions keyId={key.id} isRevoked={!!key.revokedAt} hasLegacyCertificate={!!key.revocationCertificate} hasEscrow={!!key.escrowVersion} />
               </div>
             </details>
           ))}

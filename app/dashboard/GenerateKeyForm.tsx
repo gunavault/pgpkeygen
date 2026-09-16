@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import * as openpgp from "openpgp";
 import { generatePassphrase } from "@/lib/passphrase";
 import { CopyButton } from "./CopyButton";
+import { RecoveryOptInControl } from "./RecoveryOptInControl";
 import { saveKey } from "./actions";
+import { useKeyEscrow } from "./useKeyEscrow";
 
 const ALGORITHMS = {
   curve25519: { label: "ECC (Curve25519) — recommended", genOptions: { type: "curve25519" as const } },
@@ -24,16 +26,11 @@ const EXPIRATIONS = {
   "4y": { label: "4 years", seconds: 60 * 60 * 24 * 365 * 4 },
 };
 type ExpirationKey = keyof typeof EXPIRATIONS;
-type PendingKey = Parameters<typeof saveKey>[0] & {
-  name: string;
-  email: string;
-  algorithm: string;
-  expiresAt: string | null;
-  fingerprint: string;
-};
+type PendingKey = Parameters<typeof saveKey>[0] & { fingerprint: string };
 
 export function GenerateKeyForm() {
   const router = useRouter();
+  const { recoveryAvailable, createEscrow } = useKeyEscrow();
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
   const [name, setName] = useState("");
@@ -42,6 +39,7 @@ export function GenerateKeyForm() {
   const [expiration, setExpiration] = useState<ExpirationKey>("never");
   const [passphrase, setPassphrase] = useState("");
   const [showPassphrase, setShowPassphrase] = useState(false);
+  const [recoveryEnabled, setRecoveryEnabled] = useState(false);
   const [revocationCertificate, setRevocationCertificate] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,19 +65,15 @@ export function GenerateKeyForm() {
       setPendingKey({
         title,
         details: details || null,
-        name,
-        email,
-        algorithm: ALGORITHMS[algorithm].label,
-        expiresAt: keyExpirationTime ? new Date(Date.now() + keyExpirationTime * 1000).toISOString() : null,
-        fingerprint: publicKeyObj.getFingerprint(),
         publicKey: generated.publicKey,
         privateKey: generated.privateKey,
+        fingerprint: publicKeyObj.getFingerprint(),
       });
       setRevocationCertificate(generated.revocationCertificate);
       setShowPassphrase(true);
       setPassphraseSaved(false);
       setRevocationSaved(false);
-      setStatus("Key generated locally. Save both recovery artifacts before storing the encrypted key.");
+      setStatus(recoveryEnabled ? "Key generated locally. The recovery copy will be encrypted in this browser when you save." : "Key generated locally. Save both recovery artifacts before storing the encrypted key.");
     } catch {
       setStatus("Failed to generate key.");
     } finally {
@@ -88,38 +82,36 @@ export function GenerateKeyForm() {
   }
 
   async function handleSave() {
-    if (!pendingKey || !passphraseSaved || !revocationSaved) return;
+    if (!pendingKey || (!recoveryEnabled && !passphraseSaved) || !revocationSaved) return;
     setBusy(true);
     try {
-      setStatus("Validating and saving encrypted key material…");
+      const escrow = recoveryEnabled ? await createEscrow(passphrase, pendingKey.fingerprint) : null;
       await saveKey({
         title: pendingKey.title,
         details: pendingKey.details,
         publicKey: pendingKey.publicKey,
         privateKey: pendingKey.privateKey,
+        escrow: recoveryEnabled ? escrow : null,
       });
       setPassphrase("");
       setRevocationCertificate("");
       setPendingKey(null);
-      setStatus("Key saved after server-side OpenPGP validation. Recovery artifacts stayed in your browser.");
+      setStatus(recoveryEnabled ? "Key saved. Recovery is stored only as client-encrypted ciphertext." : "Key saved after server-side OpenPGP validation. Recovery artifacts stayed in your browser.");
       router.push("/dashboard");
     } catch {
-      setStatus("Failed to validate or save key. Your local recovery artifacts have not been sent to the server.");
+      setStatus(recoveryEnabled ? "Failed to save the encrypted recovery copy. Sign out and sign in again if the in-memory recovery vault was lost." : "Failed to validate or save key. Your local recovery artifacts have not been sent to the server.");
     } finally {
       setBusy(false);
     }
   }
 
   if (pendingKey) {
+    const canSave = revocationSaved && (recoveryEnabled || passphraseSaved);
     return (
       <section className="flex flex-col gap-5 max-w-3xl">
         <div>
-          <h2 className="m-0" style={{ fontSize: 28, marginBottom: 8 }}>
-            Save your recovery artifacts before storing this key
-          </h2>
-          <p className="text-sm m-0 text-muted">
-            Neither the passphrase nor the revocation certificate will be stored by the server for new keys.
-          </p>
+          <h2 className="m-0" style={{ fontSize: 28, marginBottom: 8 }}>Save your recovery artifacts before storing this key</h2>
+          <p className="text-sm m-0 text-muted">{recoveryEnabled ? "Passphrase recovery is enabled. Only client-encrypted recovery ciphertext will be stored; the revocation certificate remains client-held." : "Neither the passphrase nor the revocation certificate will be stored by the server for this key."}</p>
         </div>
 
         <div className="field">
@@ -131,25 +123,22 @@ export function GenerateKeyForm() {
           </div>
         </div>
 
-        <label className="flex items-start gap-3 text-sm">
-          <input type="checkbox" checked={passphraseSaved} onChange={(event) => setPassphraseSaved(event.target.checked)} style={{ marginTop: 3 }} />
-          <span>I have copied or stored the passphrase somewhere safe.</span>
-        </label>
+        {!recoveryEnabled ? (
+          <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={passphraseSaved} onChange={(event) => setPassphraseSaved(event.target.checked)} style={{ marginTop: 3 }} /><span>I have copied or stored the passphrase somewhere safe.</span></label>
+        ) : (
+          <p className="text-xs text-muted m-0">The encrypted recovery copy lets you save without claiming you already copied the passphrase. Keeping an independent copy is still recommended.</p>
+        )}
 
         <div className="field">
           <div className="flex items-center justify-between mb-2"><label htmlFor="generated-revocation">Revocation certificate</label><CopyButton text={revocationCertificate} /></div>
           <textarea id="generated-revocation" value={revocationCertificate} readOnly rows={8} className="input mono text-xs" />
           <p className="text-xs text-muted m-0 mt-2">Keep this separately. Anyone who obtains it can permanently revoke this key.</p>
         </div>
-
-        <label className="flex items-start gap-3 text-sm">
-          <input type="checkbox" checked={revocationSaved} onChange={(event) => setRevocationSaved(event.target.checked)} style={{ marginTop: 3 }} />
-          <span>I have copied or stored the revocation certificate somewhere safe.</span>
-        </label>
+        <label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={revocationSaved} onChange={(event) => setRevocationSaved(event.target.checked)} style={{ marginTop: 3 }} /><span>I have copied or stored the revocation certificate somewhere safe.</span></label>
 
         {status && <p className="text-[12.5px] text-muted m-0">{status}</p>}
         <div className="flex gap-3">
-          <button type="button" disabled={!passphraseSaved || !revocationSaved || busy} className="btn btn-primary" onClick={handleSave}>{busy ? "Saving…" : "Save key to vault"}</button>
+          <button type="button" disabled={!canSave || busy} className="btn btn-primary" onClick={handleSave}>{busy ? "Saving…" : "Save key to vault"}</button>
           <button type="button" disabled={busy} className="btn btn-secondary" onClick={() => { if (window.confirm("Discard this generated key and its unsaved recovery artifacts?")) { setPendingKey(null); setPassphraseSaved(false); setRevocationSaved(false); setRevocationCertificate(""); setStatus(null); } }}>Discard generated key</button>
         </div>
       </section>
@@ -175,7 +164,8 @@ export function GenerateKeyForm() {
         <div className="flex flex-col gap-4">
           <div className="field"><label>Algorithm</label><div className="flex flex-col gap-px" style={{ border: "1px solid var(--color-divider)", background: "var(--color-divider)" }}>{Object.entries(ALGORITHMS).map(([key, { label }]) => (<label key={key} className="keyrow flex items-center gap-3 px-3.5 py-2.5 cursor-pointer" style={{ background: algorithm === key ? "color-mix(in srgb,var(--color-accent) 7%,var(--color-bg))" : "var(--color-bg)" }}><input type="radio" name="algo" checked={algorithm === key} onChange={() => setAlgorithm(key as AlgorithmKey)} style={{ accentColor: "var(--color-accent)", width: 15, height: 15, flexShrink: 0 }} /><span className="text-[13.5px] font-semibold whitespace-nowrap" style={{ fontFamily: "var(--font-heading)" }}>{label}</span></label>))}</div></div>
           <div className="field"><label>Expires</label><div className="seg flex">{Object.entries(EXPIRATIONS).map(([key, { label }]) => (<label key={key} className="seg-opt flex-1"><input type="radio" name="exp" checked={expiration === key} onChange={() => setExpiration(key as ExpirationKey)} />{label}</label>))}</div></div>
-          <div className="field"><label htmlFor="g-pass">Passphrase <span className="normal-case text-muted font-normal">— protects the private key</span></label><div className="flex gap-2"><input id="g-pass" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} type={showPassphrase ? "text" : "password"} placeholder="8+ characters" minLength={8} required className="input mono flex-1" /><button type="button" onClick={() => { setPassphrase(generatePassphrase()); setShowPassphrase(true); }} className="btn btn-secondary whitespace-nowrap">Generate</button></div>{passphrase && <div className="flex items-center gap-4 mt-2.5 text-xs text-muted"><button type="button" onClick={() => setShowPassphrase((v) => !v)} className="lnk">{showPassphrase ? "Hide" : "Show"}</button><CopyButton text={passphrase} /><span>Keep it safe — the server will never receive it.</span></div>}</div>
+          <div className="field"><label htmlFor="g-pass">Passphrase <span className="normal-case text-muted font-normal">— protects the private key</span></label><div className="flex gap-2"><input id="g-pass" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} type={showPassphrase ? "text" : "password"} placeholder="8+ characters" minLength={8} required className="input mono flex-1" /><button type="button" onClick={() => { setPassphrase(generatePassphrase()); setShowPassphrase(true); }} className="btn btn-secondary whitespace-nowrap">Generate</button></div>{passphrase && <div className="flex items-center gap-4 mt-2.5 text-xs text-muted"><button type="button" onClick={() => setShowPassphrase((v) => !v)} className="lnk">{showPassphrase ? "Hide" : "Show"}</button><CopyButton text={passphrase} /><span>The plaintext stays in this browser.</span></div>}</div>
+          <RecoveryOptInControl enabled={recoveryEnabled} available={recoveryAvailable} onChange={setRecoveryEnabled} />
         </div>
       </section>
 
