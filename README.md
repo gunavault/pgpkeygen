@@ -65,15 +65,28 @@ not proof of ownership, so privileged roles are never derived from a submitted
 registration email.
 
 After the intended administrator has registered, an operator with database
-access can explicitly promote that existing account:
+access can explicitly promote that existing account.
+
+From a local checkout or another trusted operator environment with `pnpm`:
 
 ```bash
 DATABASE_URL=postgres://... pnpm admin:promote -- admin@example.com
 ```
 
+For the documented Docker Compose deployment, run the script already shipped in
+the application container:
+
+```bash
+docker compose exec app node scripts/promote-admin.mjs admin@example.com
+```
+
 The command fails unless exactly one existing account matches the normalized
 email. Run it only from a trusted operator environment. There is no
 `ADMIN_EMAILS` self-registration shortcut.
+
+The role is copied into the user's JWT when they sign in. After promotion, the
+user must **sign out and sign back in** before `/dashboard/admin` reflects the
+new role. Reloading an existing session is not enough.
 
 For local development that needs Postgres reachable from the host, opt in to the
 development override. It binds only to loopback:
