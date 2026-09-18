@@ -1,5 +1,5 @@
-import { db } from "@/lib/db";
-import { auditLog } from "@/lib/db/schema";
+import { db } from "./db/index.ts";
+import { auditLog } from "./db/schema.ts";
 
 export type AuditAction =
   | "user.registered"
