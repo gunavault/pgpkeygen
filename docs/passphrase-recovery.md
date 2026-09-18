@@ -31,9 +31,28 @@ The application fetches the opaque envelope/ciphertext before opening a network-
 
 ## Password rotation
 
-The account password protects the single vault-key envelope rather than every per-key ciphertext directly. A password-change flow must unwrap the existing random vault key and re-wrap that same key under the new password. It must not replace the random vault key, because that would orphan all existing escrowed passphrases.
+The account password protects the single vault-key envelope rather than every per-key ciphertext directly. Password change therefore rotates one envelope and leaves every per-key escrow ciphertext untouched.
 
-This makes password rotation a single-envelope operation and also leaves a clean upgrade path for stronger future key sources such as WebAuthn PRF.
+Before a password change is submitted, the browser:
+
+1. opens the existing envelope with the current password;
+2. re-wraps that exact vault key under the new password using fresh envelope salt and IV values;
+3. opens the candidate envelope with the new password and byte-compares the recovered vault key to the original; and
+4. when an escrow record exists, decrypts one owner-scoped escrow sample with the verified vault key and the server-provided user-ID/fingerprint AAD.
+
+Any failed check aborts before the database update. This catches a structurally valid envelope that accidentally wraps the wrong vault key, which shape validation alone cannot detect.
+
+The server does not open the vault envelope. It verifies the current account password, validates the opaque candidate record, rejects a candidate that reuses the stored envelope salt or IV, and commits the password hash, candidate envelope, and `password.changed` audit entry in one database transaction. If the audit insert or any other transactional operation fails, the credential and envelope changes roll back together.
+
+Accounts with no vault envelope use the same authenticated password-change path but update only the account password hash.
+
+Changing the password does **not** currently revoke already-issued JWT sessions. Session invalidation is a separate capability and must not be inferred from successful credential rotation.
+
+## Forgotten-password reset
+
+Password reset is intentionally not part of password rotation. With the current design, the random vault key is recoverable only through the envelope protected by the existing account password.
+
+If an operator replaced a forgotten account password without the old password or a separately provisioned recovery envelope, the account and encrypted PGP keys could remain in the database, but existing escrowed passphrase copies would become unreadable because the vault key could no longer be opened. Preserving those recovery copies across a forgotten-password reset requires an independent recovery mechanism such as a separately held recovery-code envelope.
 
 ## Threat model
 
@@ -52,6 +71,6 @@ That tradeoff is why the checkbox defaults off and the warning is shown next to 
 
 ## Server boundary
 
-`tests/passphrase-boundary.test.ts` remains unchanged. `app/dashboard/actions.ts` accepts only a bounded opaque escrow DTO and never receives the plaintext private-key passphrase. Server-side storage validates format versions and sizes before persistence.
+`tests/passphrase-boundary.test.ts` remains unchanged. `app/dashboard/actions.ts` accepts only a bounded opaque escrow DTO and never receives the plaintext private-key passphrase. The password-change server action receives account credentials and an opaque candidate vault envelope, but performs no vault unwrap or per-key passphrase decryption. Server-side storage validates format versions and sizes before persistence.
 
 Revocation certificates remain client-held for new keys and are outside this feature's passphrase-recovery scope.
