@@ -36,11 +36,11 @@ test("recovery access and enablement are audited with metadata only", () => {
   const getKeyEscrow = functionSource(escrowActionsSource, "getKeyEscrow");
   assert.match(
     getKeyEscrow,
-    /logAudit\([^;]*"recovery\.accessed"[^;]*key\.title[^;]*key\.fingerprint[^;]*\)/s,
+    /logAudit\([\s\S]*?"recovery\.accessed"[\s\S]*?key\.title[\s\S]*?key\.fingerprint[\s\S]*?\)/,
   );
 
   const recoveryAuditCall =
-    getKeyEscrow.match(/logAudit\([^;]*"recovery\.accessed"[^;]*\)/s)?.[0] ?? "";
+    getKeyEscrow.match(/logAudit\([\s\S]*?"recovery\.accessed"[\s\S]*?\)/)?.[0] ?? "";
   assert.doesNotMatch(
     recoveryAuditCall,
     /payload|ciphertext|escrowIv|escrowCiphertext|envelope|vaultWrappedKey|vaultKdf/i,
@@ -49,10 +49,10 @@ test("recovery access and enablement are audited with metadata only", () => {
   const saveKey = functionSource(dashboardActionsSource, "saveKey");
   assert.match(
     saveKey,
-    /logAudit\([^;]*"recovery\.enabled"[^;]*title[^;]*metadata\.fingerprint[^;]*\)/s,
+    /logAudit\([\s\S]*?"recovery\.enabled"[\s\S]*?title[\s\S]*?metadata\.fingerprint[\s\S]*?\)/,
   );
   const enableAuditCall =
-    saveKey.match(/logAudit\([^;]*"recovery\.enabled"[^;]*\)/s)?.[0] ?? "";
+    saveKey.match(/logAudit\([\s\S]*?"recovery\.enabled"[\s\S]*?\)/)?.[0] ?? "";
   assert.doesNotMatch(enableAuditCall, /ciphertext|escrowIv|escrowCiphertext|privateKey|publicKey/i);
 });
 
@@ -60,18 +60,18 @@ test("legacy revocation access and deletion are audited without certificate mate
   const exported = functionSource(dashboardActionsSource, "getLegacyRevocationCertificate");
   assert.match(
     exported,
-    /logAudit\([^;]*"revocation\.exported"[^;]*key\.title[^;]*key\.fingerprint[^;]*\)/s,
+    /logAudit\([\s\S]*?"revocation\.exported"[\s\S]*?key\.title[\s\S]*?key\.fingerprint[\s\S]*?\)/,
   );
   const exportAuditCall =
-    exported.match(/logAudit\([^;]*"revocation\.exported"[^;]*\)/s)?.[0] ?? "";
+    exported.match(/logAudit\([\s\S]*?"revocation\.exported"[\s\S]*?\)/)?.[0] ?? "";
   assert.doesNotMatch(exportAuditCall, /revocationCertificate|certificate/i);
 
   const forgotten = functionSource(dashboardActionsSource, "forgetLegacyRevocationCertificate");
   assert.match(
     forgotten,
-    /logAudit\([^;]*"revocation\.forgotten"[^;]*forgotten\.title[^;]*forgotten\.fingerprint[^;]*\)/s,
+    /logAudit\([\s\S]*?"revocation\.forgotten"[\s\S]*?forgotten\.title[\s\S]*?forgotten\.fingerprint[\s\S]*?\)/,
   );
   const forgetAuditCall =
-    forgotten.match(/logAudit\([^;]*"revocation\.forgotten"[^;]*\)/s)?.[0] ?? "";
+    forgotten.match(/logAudit\([\s\S]*?"revocation\.forgotten"[\s\S]*?\)/)?.[0] ?? "";
   assert.doesNotMatch(forgetAuditCall, /revocationCertificate|certificate/i);
 });
