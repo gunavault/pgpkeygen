@@ -11,13 +11,32 @@ export type AuditAction =
   | "recovery.accessed"
   | "recovery.enabled"
   | "revocation.exported"
-  | "revocation.forgotten";
+  | "revocation.forgotten"
+  | "password.changed";
+
+export type AuditEntry = {
+  actorEmail: string;
+  action: AuditAction;
+  target?: string;
+  details?: string;
+};
+
+export type AuditWriter = {
+  write: (entry: AuditEntry) => Promise<void>;
+};
+
+const databaseAuditWriter: AuditWriter = {
+  async write(entry) {
+    await db.insert(auditLog).values(entry);
+  },
+};
 
 export async function logAudit(
   actorEmail: string,
   action: AuditAction,
   target?: string,
   details?: string,
+  writer: AuditWriter = databaseAuditWriter,
 ) {
-  await db.insert(auditLog).values({ actorEmail, action, target, details });
+  await writer.write({ actorEmail, action, target, details });
 }
