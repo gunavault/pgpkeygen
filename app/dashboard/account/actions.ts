@@ -65,6 +65,7 @@ export async function changePassword(input: {
 }): Promise<ChangePasswordResult> {
   const session = await auth();
   if (!session?.user?.id || !session.user.email) throw new Error("Unauthorized");
+  const actorEmail = session.user.email;
 
   const ip = await getClientIp();
   const accountLimited = isRateLimited(`password-change:account:${session.user.id}`, PASSWORD_CHANGE_ACCOUNT_LIMIT, PASSWORD_CHANGE_WINDOW_MS);
@@ -117,7 +118,7 @@ export async function changePassword(input: {
     if (error instanceof Error) {
       if (/current password/i.test(error.message)) {
         try {
-          await logAudit(session.user.email, "password.change_failed");
+          await logAudit(actorEmail, "password.change_failed");
         } catch {
           console.error("password change failure audit failed");
         }
