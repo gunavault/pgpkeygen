@@ -17,7 +17,10 @@ function cloneEnvelope(envelope: VaultEnvelope | null): VaultEnvelope | null {
   return envelope ? { ...envelope } : null;
 }
 
-function createEnvironment(initial: State): {
+function createEnvironment(
+  initial: State,
+  options: { auditFails?: boolean } = {},
+): {
   environment: PasswordChangeEnvironment;
   state: () => State;
   commits: () => number;
@@ -52,6 +55,7 @@ function createEnvironment(initial: State): {
           staged.envelope = cloneEnvelope(envelope);
         },
         async auditPasswordChanged(email) {
+          if (options.auditFails) throw new Error("Audit insert failed");
           staged.audit.push(`password.changed:${email}`);
         },
       };
@@ -148,6 +152,39 @@ test("vault account commits the new password hash and candidate envelope togethe
   assert.equal(await verifyPassword("new-account-password", harness.state().passwordHash), true);
   assert.deepEqual(harness.state().envelope, candidate.envelope);
   assert.deepEqual(harness.state().audit, ["password.changed:user@example.com"]);
+});
+
+test("audit failure rolls back both the password hash and vault envelope", async () => {
+  const passwordHash = await hashPassword("current-account-password");
+  const existing = await createVaultEnvelope("current-account-password");
+  const candidate = await createVaultEnvelope("new-account-password");
+  const harness = createEnvironment(
+    {
+      email: "user@example.com",
+      passwordHash,
+      envelope: existing.envelope,
+      audit: [],
+    },
+    { auditFails: true },
+  );
+
+  await assert.rejects(
+    performPasswordChange(
+      {
+        userId: "user-1",
+        currentPassword: "current-account-password",
+        newPassword: "new-account-password",
+        newEnvelope: candidate.envelope,
+      },
+      harness.environment,
+    ),
+    /audit insert failed/i,
+  );
+
+  assert.equal(harness.commits(), 0);
+  assert.equal(harness.state().passwordHash, passwordHash);
+  assert.deepEqual(harness.state().envelope, existing.envelope);
+  assert.deepEqual(harness.state().audit, []);
 });
 
 test("vault rotation rejects replayed envelope randomness before any write", async () => {
