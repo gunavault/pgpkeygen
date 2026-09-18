@@ -31,11 +31,47 @@ export type PasswordChangeInput = {
   newEnvelope: VaultEnvelope | null;
 };
 
+function hasEnvelope(envelope: VaultEnvelope | null): envelope is VaultEnvelope {
+  return envelope !== null;
+}
+
 export async function performPasswordChange(
   input: PasswordChangeInput,
   environment: PasswordChangeEnvironment,
 ): Promise<void> {
-  void input;
-  void environment;
-  throw new Error("Not implemented");
+  if (!input.userId || !input.currentPassword || input.newPassword.length < 8) {
+    throw new Error("Invalid password change request");
+  }
+
+  await environment.transaction(async (tx) => {
+    const account = await tx.loadAccountForUpdate(input.userId);
+    if (!account) throw new Error("Account not found");
+
+    const currentPasswordValid = await environment.verifyPassword(
+      input.currentPassword,
+      account.passwordHash,
+    );
+    if (!currentPasswordValid) {
+      throw new Error("Current password is incorrect");
+    }
+
+    const storedHasEnvelope = hasEnvelope(account.envelope);
+    const candidateHasEnvelope = hasEnvelope(input.newEnvelope);
+    if (storedHasEnvelope !== candidateHasEnvelope) {
+      throw new Error("Vault envelope state does not match account");
+    }
+
+    if (storedHasEnvelope && candidateHasEnvelope) {
+      if (
+        input.newEnvelope.salt === account.envelope.salt ||
+        input.newEnvelope.iv === account.envelope.iv
+      ) {
+        throw new Error("Fresh vault envelope randomness is required");
+      }
+    }
+
+    const newPasswordHash = await environment.hashPassword(input.newPassword);
+    await tx.updateCredentials(input.userId, newPasswordHash, input.newEnvelope);
+    await tx.auditPasswordChanged(account.email);
+  });
 }
