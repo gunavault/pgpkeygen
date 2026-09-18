@@ -20,6 +20,22 @@ Reveal is shown only for keys that contain recovery ciphertext. It always asks f
 
 See `docs/passphrase-recovery.md` for the envelope format, password-rotation rule, AAD rationale, and detailed threat model.
 
+## Password changes
+
+A signed-in user can rotate the account password without rewriting each escrowed PGP passphrase. The browser unwraps the existing vault envelope with the current password, re-wraps the same random vault key under the new password, then opens the candidate envelope again and verifies that the recovered bytes exactly match the original vault key.
+
+When the account has escrowed PGP passphrases, the browser also opens one owner-scoped escrow sample with that verified key and its authoritative user-ID/fingerprint AAD before submitting the rotation. A failed unwrap, key comparison, or escrow check aborts before the credential update.
+
+The server never performs vault cryptography. It verifies the current account password, validates the opaque candidate envelope, rejects reused envelope salt or IV values, and commits the new password hash, envelope, and `password.changed` audit event in one database transaction. Accounts with no vault envelope update only the password hash.
+
+Changing the password does not currently invalidate already-issued JWT sessions. Session invalidation is a separate account-security capability rather than part of vault rotation.
+
+## Forgotten-password reset cost
+
+A forgotten-password reset is **not implemented** by this flow. The current vault key has only the account-password-wrapped envelope. Without the old password or a separately provisioned recovery envelope/code, an operator can replace the account credential but cannot recover or re-wrap that vault key.
+
+That means an operator-assisted reset built on the current model would preserve the account and stored encrypted PGP keys but would orphan the existing escrowed passphrase recovery copies. The underlying PGP keys are not deleted; the recovery ciphertexts simply become unreadable because the old vault key can no longer be opened. A reset path that preserves recovery requires a second independently held recovery mechanism and must be designed separately.
+
 ## Security tradeoff
 
 Recovery changes the compromise model. With recovery disabled, a database copy of an encrypted private key still requires the independently kept private-key passphrase. With recovery enabled, stored recovery material allows offline guessing against the account password.

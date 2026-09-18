@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const BASE_TABS: { href: string; label: string; badge?: string }[] = [
   { href: "/dashboard", label: "Your keys" },
   { href: "/dashboard/generate", label: "Generate" },
+  { href: "/dashboard/account", label: "Account" },
 ];
 const ADMIN_TAB = { href: "/dashboard/admin", label: "Audit log", badge: "ADMIN" };
 
