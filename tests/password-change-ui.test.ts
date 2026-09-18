@@ -37,6 +37,19 @@ test("server password action owns credentials but not browser vault crypto", () 
   );
 });
 
+test("password-change endpoint is throttled by account and source and audits failed verification", () => {
+  assert.match(actions, /isRateLimited/);
+  assert.match(actions, /password-change:account:/);
+  assert.match(actions, /password-change:source:/);
+  assert.match(actions, /password\.change_failed/);
+  assert.match(actions, /current password[\s\S]*password\.change_failed/i);
+});
+
+test("password-change UI reports throttling without exposing another verification oracle", () => {
+  assert.match(form, /ratelimited/);
+  assert.match(form, /Too many password-change attempts/i);
+});
+
 test("password-change UI does not overpromise session invalidation or password reset", () => {
   assert.match(form, /does not sign out existing sessions/i);
   assert.doesNotMatch(form, /reset password|forgot password/i);
