@@ -31,10 +31,6 @@ export type PasswordChangeInput = {
   newEnvelope: VaultEnvelope | null;
 };
 
-function hasEnvelope(envelope: VaultEnvelope | null): envelope is VaultEnvelope {
-  return envelope !== null;
-}
-
 export async function performPasswordChange(
   input: PasswordChangeInput,
   environment: PasswordChangeEnvironment,
@@ -55,23 +51,23 @@ export async function performPasswordChange(
       throw new Error("Current password is incorrect");
     }
 
-    const storedHasEnvelope = hasEnvelope(account.envelope);
-    const candidateHasEnvelope = hasEnvelope(input.newEnvelope);
-    if (storedHasEnvelope !== candidateHasEnvelope) {
+    const storedEnvelope = account.envelope;
+    const candidateEnvelope = input.newEnvelope;
+    if ((storedEnvelope === null) !== (candidateEnvelope === null)) {
       throw new Error("Vault envelope state does not match account");
     }
 
-    if (storedHasEnvelope && candidateHasEnvelope) {
+    if (storedEnvelope && candidateEnvelope) {
       if (
-        input.newEnvelope.salt === account.envelope.salt ||
-        input.newEnvelope.iv === account.envelope.iv
+        candidateEnvelope.salt === storedEnvelope.salt ||
+        candidateEnvelope.iv === storedEnvelope.iv
       ) {
         throw new Error("Fresh vault envelope randomness is required");
       }
     }
 
     const newPasswordHash = await environment.hashPassword(input.newPassword);
-    await tx.updateCredentials(input.userId, newPasswordHash, input.newEnvelope);
+    await tx.updateCredentials(input.userId, newPasswordHash, candidateEnvelope);
     await tx.auditPasswordChanged(account.email);
   });
 }
