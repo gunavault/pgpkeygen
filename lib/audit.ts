@@ -7,7 +7,11 @@ export type AuditAction =
   | "login.failed"
   | "key.generated"
   | "key.revoked"
-  | "key.deleted";
+  | "key.deleted"
+  | "recovery.accessed"
+  | "recovery.enabled"
+  | "revocation.exported"
+  | "revocation.forgotten";
 
 export async function logAudit(
   actorEmail: string,

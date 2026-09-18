@@ -2,6 +2,7 @@
 
 import { and, eq, isNull } from "drizzle-orm";
 import { auth } from "@/auth";
+import { logAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { pgpKeys, users } from "@/lib/db/schema";
 import {
@@ -86,9 +87,13 @@ export async function initializeVaultEnvelope(input: unknown) {
 }
 
 export async function getKeyEscrow(keyId: string) {
-  const userId = await authenticatedUserId();
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   const [key] = await db
     .select({
+      title: pgpKeys.title,
       fingerprint: pgpKeys.fingerprint,
       escrowCiphertext: pgpKeys.escrowCiphertext,
       escrowIv: pgpKeys.escrowIv,
@@ -111,6 +116,13 @@ export async function getKeyEscrow(keyId: string) {
 
   const envelope = vaultEnvelopeFromRow(user);
   if (!envelope) throw new Error("Recovery envelope unavailable");
+
+  await logAudit(
+    session.user.email!,
+    "recovery.accessed",
+    key.title,
+    `fingerprint: ${key.fingerprint}`,
+  );
 
   return {
     envelope,

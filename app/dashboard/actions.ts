@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq, isNotNull, sql } from "drizzle-orm";
 import * as openpgp from "openpgp";
 import { revalidatePath } from "next/cache";
 import { auth, signOut } from "@/auth";
@@ -30,6 +30,7 @@ export async function saveKey(input: {
 
   const metadata = await validateKeyMaterial(input.publicKey, input.privateKey);
   const escrow = escrowColumns(input.escrow ?? null);
+  const recoveryEnabled = escrow.escrowVersion !== null;
   const maxKeys = parseMaxKeysPerUser(process.env.MAX_KEYS_PER_USER);
 
   await db.transaction(async (tx) => {
@@ -60,6 +61,14 @@ export async function saveKey(input: {
   });
 
   await logAudit(session.user.email!, "key.generated", title, `fingerprint: ${metadata.fingerprint}`);
+  if (recoveryEnabled) {
+    await logAudit(
+      session.user.email!,
+      "recovery.enabled",
+      title,
+      `fingerprint: ${metadata.fingerprint}`,
+    );
+  }
 
   revalidatePath("/dashboard");
 }
@@ -69,12 +78,26 @@ export async function getLegacyRevocationCertificate(keyId: string): Promise<str
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const [key] = await db
-    .select({ revocationCertificate: pgpKeys.revocationCertificate })
+    .select({
+      title: pgpKeys.title,
+      fingerprint: pgpKeys.fingerprint,
+      revocationCertificate: pgpKeys.revocationCertificate,
+    })
     .from(pgpKeys)
     .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, session.user.id)))
     .limit(1);
 
   if (!key) throw new Error("Not found");
+
+  if (key.revocationCertificate !== null) {
+    await logAudit(
+      session.user.email!,
+      "revocation.exported",
+      key.title,
+      `fingerprint: ${key.fingerprint}`,
+    );
+  }
+
   return key.revocationCertificate;
 }
 
@@ -82,10 +105,26 @@ export async function forgetLegacyRevocationCertificate(keyId: string): Promise<
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  await db
+  const [forgotten] = await db
     .update(pgpKeys)
     .set({ revocationCertificate: null })
-    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, session.user.id)));
+    .where(
+      and(
+        eq(pgpKeys.id, keyId),
+        eq(pgpKeys.userId, session.user.id),
+        isNotNull(pgpKeys.revocationCertificate),
+      ),
+    )
+    .returning({ title: pgpKeys.title, fingerprint: pgpKeys.fingerprint });
+
+  if (forgotten) {
+    await logAudit(
+      session.user.email!,
+      "revocation.forgotten",
+      forgotten.title,
+      `fingerprint: ${forgotten.fingerprint}`,
+    );
+  }
 
   revalidatePath("/dashboard");
 }
