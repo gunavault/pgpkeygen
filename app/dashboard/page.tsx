@@ -3,7 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
-import { classifyKeyExpiry, expiryStatusPriority } from "@/lib/key-expiry";
+import { prioritizeKeysByExpiry } from "@/lib/key-expiry";
 import { CopyButton } from "./CopyButton";
 import { KeyActions } from "./KeyActions";
 
@@ -23,20 +23,7 @@ export default async function DashboardPage() {
     .where(eq(pgpKeys.userId, userId))
     .orderBy(desc(pgpKeys.createdAt));
 
-  const now = new Date();
-  const prioritizedKeys = keys
-    .map((key) => ({
-      key,
-      expiryStatus: classifyKeyExpiry(key.expiresAt, now),
-    }))
-    .sort((left, right) => {
-      const priority =
-        expiryStatusPriority(left.expiryStatus) -
-        expiryStatusPriority(right.expiryStatus);
-      if (priority !== 0) return priority;
-
-      return right.key.createdAt.getTime() - left.key.createdAt.getTime();
-    });
+  const prioritizedKeys = prioritizeKeysByExpiry(keys);
 
   return (
     <div className="flex flex-col gap-5">
