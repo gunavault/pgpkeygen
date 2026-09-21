@@ -99,13 +99,36 @@ export async function changePassword(input: {
         },
         async updateCredentials(userId, passwordHash, envelope) {
           if (envelope) {
-            await tx.update(users).set({ passwordHash, ...vaultEnvelopeColumns(envelope) }).where(eq(users.id, userId));
+            await tx
+              .update(users)
+              .set({
+                passwordHash,
+                sessionsValidAfter: new Date(),
+                ...vaultEnvelopeColumns(envelope),
+              })
+              .where(eq(users.id, userId));
             return;
           }
-          await tx.update(users).set({ passwordHash }).where(eq(users.id, userId));
+          await tx
+            .update(users)
+            .set({ passwordHash, sessionsValidAfter: new Date() })
+            .where(eq(users.id, userId));
         },
         async auditPasswordChanged(email) {
-          await logAudit(email, "password.changed", undefined, undefined, transactionAuditWriter);
+          await logAudit(
+            email,
+            "password.changed",
+            undefined,
+            undefined,
+            transactionAuditWriter,
+          );
+          await logAudit(
+            email,
+            "session.invalidated",
+            undefined,
+            "reason: password change",
+            transactionAuditWriter,
+          );
         },
       });
     }),
@@ -129,4 +152,33 @@ export async function changePassword(input: {
     console.error("password change failed");
     return { ok: false, error: "server" };
   }
+}
+
+
+export async function invalidateAllSessions(): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.email) throw new Error("Unauthorized");
+  const userId = session.user.id;
+  const actorEmail = session.user.email;
+
+  await db.transaction(async (tx) => {
+    const transactionAuditWriter: AuditWriter = {
+      async write(entry) {
+        await tx.insert(auditLog).values(entry);
+      },
+    };
+
+    await tx
+      .update(users)
+      .set({ sessionsValidAfter: new Date() })
+      .where(eq(users.id, userId));
+
+    await logAudit(
+      actorEmail,
+      "session.invalidated",
+      undefined,
+      "reason: user requested sign out everywhere",
+      transactionAuditWriter,
+    );
+  });
 }
