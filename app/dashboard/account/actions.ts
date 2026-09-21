@@ -8,9 +8,9 @@ import { auditLog, pgpKeys, users } from "@/lib/db/schema";
 import { escrowPayloadFromRow, vaultEnvelopeColumns, vaultEnvelopeFromRow } from "@/lib/escrow-storage";
 import {
   handlePasswordChangeRequest,
-  type ChangePasswordResult,
   type PasswordChangeRequestEnvironment,
 } from "@/lib/password-change-request";
+export type { ChangePasswordResult } from "@/lib/password-change-request";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import type { EscrowVerificationSample } from "@/lib/vault-rotation";
