@@ -10,6 +10,10 @@ const actions = readFileSync(
   new URL("../app/dashboard/account/actions.ts", import.meta.url),
   "utf8",
 );
+const requestPolicy = readFileSync(
+  new URL("../lib/password-change-request.ts", import.meta.url),
+  "utf8",
+);
 const tabs = readFileSync(new URL("../app/dashboard/TabNav.tsx", import.meta.url), "utf8");
 
 test("dashboard exposes a focused account password-change page", () => {
@@ -45,4 +49,13 @@ test("password-change UI reports throttling without exposing another verificatio
 test("password-change UI does not overpromise session invalidation or password reset", () => {
   assert.match(form, /does not sign out existing sessions/i);
   assert.doesNotMatch(form, /reset password|forgot password/i);
+});
+
+
+test("password-change request policy keeps named account/source limits and failure-audit hook visible", () => {
+  assert.match(requestPolicy, /PASSWORD_CHANGE_ACCOUNT_LIMIT = 5/);
+  assert.match(requestPolicy, /PASSWORD_CHANGE_SOURCE_LIMIT = 30/);
+  assert.match(requestPolicy, /password-change:account:/);
+  assert.match(requestPolicy, /password-change:source:/);
+  assert.match(requestPolicy, /auditPasswordChangeFailed/);
 });
