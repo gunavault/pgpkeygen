@@ -87,9 +87,9 @@ export async function importKey(input: {
   escrow?: unknown;
 }): Promise<ImportKeyResult> {
   const session = await auth();
-  if (!session?.user?.id || !actorEmail) throw new Error("Unauthorized");
-  const userId = userId;
-  const actorEmail = actorEmail;
+  if (!session?.user?.id || !session.user.email) throw new Error("Unauthorized");
+  const userId = session.user.id;
+  const actorEmail = session.user.email;
 
   const title = input.title.trim();
   const details = input.details?.trim() || null;
