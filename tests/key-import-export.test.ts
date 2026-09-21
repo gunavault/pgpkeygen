@@ -6,6 +6,7 @@ import {
   keyExportFilenames,
   sanitizeKeyFilenamePart,
 } from "../lib/key-export.ts";
+import { verifyImportedKeyRecoverySecret } from "../lib/key-import-client.ts";
 import { evaluateKeyImportPolicy } from "../lib/key-import-policy.ts";
 import { validateKeyMaterial } from "../lib/pgp-validation.ts";
 
@@ -80,5 +81,49 @@ test("exported armored key material round-trips through authoritative import val
       algorithm: before.algorithm,
       expiresAt: before.expiresAt?.getTime() ?? null,
     },
+  );
+});
+
+
+test("import recovery secret must decrypt the matching private key before escrow", async () => {
+  const generated = await openpgp.generateKey({
+    type: "curve25519",
+    userIDs: [{ name: "Grace Hopper", email: "grace@example.com" }],
+    passphrase: "correct-import-secret",
+    format: "armored",
+  });
+
+  const parsed = await openpgp.readKey({ armoredKey: generated.publicKey });
+  assert.equal(
+    await verifyImportedKeyRecoverySecret(
+      generated.publicKey,
+      generated.privateKey,
+      "correct-import-secret",
+    ),
+    parsed.getFingerprint(),
+  );
+
+  await assert.rejects(
+    verifyImportedKeyRecoverySecret(
+      generated.publicKey,
+      generated.privateKey,
+      "wrong-import-secret",
+    ),
+  );
+
+  const other = await openpgp.generateKey({
+    type: "curve25519",
+    userIDs: [{ name: "Other User", email: "other@example.com" }],
+    passphrase: "correct-import-secret",
+    format: "armored",
+  });
+
+  await assert.rejects(
+    verifyImportedKeyRecoverySecret(
+      generated.publicKey,
+      other.privateKey,
+      "correct-import-secret",
+    ),
+    /same key pair/i,
   );
 });
