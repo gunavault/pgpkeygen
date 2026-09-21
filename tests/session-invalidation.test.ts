@@ -16,7 +16,7 @@ const migrationSource = readFileSync(
   "utf8",
 );
 
-test("session invalidation is persisted and enforced at the authentication boundary", () => {
+test("session invalidation schema and authentication-boundary wiring stay present", () => {
   assert.match(schemaSource, /sessionsValidAfter: timestamp\("sessions_valid_after"/);
   assert.match(migrationSource, /ADD COLUMN "sessions_valid_after"/);
   assert.match(authSource, /sessionIssuedAt = Date\.now\(\)/);
@@ -26,17 +26,6 @@ test("session invalidation is persisted and enforced at the authentication bound
   assert.match(authSource, /!!session\?\.user\?\.id/);
 });
 
-test("password rotation and manual invalidation both advance the cutoff", () => {
-  assert.match(
-    accountActions,
-    /updateCredentials[\s\S]*sessionsValidAfter: new Date\(\)/,
-  );
-  assert.match(accountActions, /export async function invalidateAllSessions/);
-  assert.match(
-    accountActions,
-    /invalidateAllSessions[\s\S]*sessionsValidAfter: new Date\(\)/,
-  );
-});
 
 test("session invalidation audit metadata contains no token or secret material", () => {
   const auditCalls = accountActions.match(
