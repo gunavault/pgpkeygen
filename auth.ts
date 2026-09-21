@@ -8,10 +8,8 @@ import { verifyPassword } from "@/lib/password";
 import { logAudit } from "@/lib/audit";
 import { isSessionValidAfterCutoff } from "@/lib/session-validity";
 
-const SESSION_MAX_AGE_SECONDS = 24 * 60 * 60;
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS },
+  session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [
     Credentials({
