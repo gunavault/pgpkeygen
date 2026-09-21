@@ -13,7 +13,9 @@ export type PasswordChangeTransaction = {
     passwordHash: string,
     envelope: VaultEnvelope | null,
   ) => Promise<void>;
+  invalidateSessions: (userId: string) => Promise<void>;
   auditPasswordChanged: (email: string) => Promise<void>;
+  auditSessionsInvalidated: (email: string) => Promise<void>;
 };
 
 export type PasswordChangeEnvironment = {
@@ -68,6 +70,8 @@ export async function performPasswordChange(
 
     const newPasswordHash = await environment.hashPassword(input.newPassword);
     await tx.updateCredentials(input.userId, newPasswordHash, candidateEnvelope);
+    await tx.invalidateSessions(input.userId);
     await tx.auditPasswordChanged(account.email);
+    await tx.auditSessionsInvalidated(account.email);
   });
 }
