@@ -45,7 +45,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (!session.user || !token.id) return session;
+      const userId = typeof token.id === "string" ? token.id : null;
+      if (!session.user || !userId) return session;
 
       const [user] = await db
         .select({
@@ -53,7 +54,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           sessionsValidAfter: users.sessionsValidAfter,
         })
         .from(users)
-        .where(eq(users.id, token.id))
+        .where(eq(users.id, userId))
         .limit(1);
 
       const issuedAtMs =
@@ -72,7 +73,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return session;
       }
 
-      session.user.id = token.id;
+      session.user.id = userId;
       session.user.role = user.role;
       return session;
     },
