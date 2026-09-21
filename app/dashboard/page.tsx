@@ -35,12 +35,6 @@ export default async function DashboardPage() {
         expiryStatusPriority(right.expiryStatus);
       if (priority !== 0) return priority;
 
-      if (left.key.expiresAt && right.key.expiresAt) {
-        const byExpiry =
-          left.key.expiresAt.getTime() - right.key.expiresAt.getTime();
-        if (byExpiry !== 0) return byExpiry;
-      }
-
       return right.key.createdAt.getTime() - left.key.createdAt.getTime();
     });
 
