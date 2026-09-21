@@ -11,7 +11,7 @@ import { hashPassword, verifyPassword } from "../lib/password.ts";
 import { createVaultEnvelope } from "../lib/vault-escrow.ts";
 import type { VaultEnvelope } from "../lib/vault-escrow.ts";
 
-type State = PasswordChangeAccount & { audit: string[] };
+type State = PasswordChangeAccount & { audit: string[]; sessionsValidAfter: Date | null };
 
 function cloneEnvelope(envelope: VaultEnvelope | null): VaultEnvelope | null {
   return envelope ? { ...envelope } : null;
@@ -54,9 +54,16 @@ function createEnvironment(
           staged.passwordHash = passwordHash;
           staged.envelope = cloneEnvelope(envelope);
         },
+        async invalidateSessions() {
+          staged.sessionsValidAfter = new Date("2026-09-21T12:00:00.500Z");
+        },
         async auditPasswordChanged(email) {
           if (options.auditFails) throw new Error("Audit insert failed");
           staged.audit.push(`password.changed:${email}`);
+        },
+        async auditSessionsInvalidated(email) {
+          if (options.auditFails) throw new Error("Audit insert failed");
+          staged.audit.push(`session.invalidated:${email}`);
         },
       };
 
@@ -81,6 +88,7 @@ test("wrong current password changes nothing and writes no audit entry", async (
     passwordHash,
     envelope: null,
     audit: [],
+    sessionsValidAfter: null,
   });
 
   await assert.rejects(
@@ -108,6 +116,7 @@ test("account without a vault envelope changes only the password hash", async ()
     passwordHash,
     envelope: null,
     audit: [],
+    sessionsValidAfter: null,
   });
 
   await performPasswordChange(
@@ -124,7 +133,14 @@ test("account without a vault envelope changes only the password hash", async ()
   assert.equal(await verifyPassword("new-account-password", harness.state().passwordHash), true);
   assert.equal(await verifyPassword("current-account-password", harness.state().passwordHash), false);
   assert.equal(harness.state().envelope, null);
-  assert.deepEqual(harness.state().audit, ["password.changed:user@example.com"]);
+  assert.deepEqual(harness.state().audit, [
+    "password.changed:user@example.com",
+    "session.invalidated:user@example.com",
+  ]);
+  assert.equal(
+    harness.state().sessionsValidAfter?.toISOString(),
+    "2026-09-21T12:00:00.500Z",
+  );
 });
 
 test("vault account commits the new password hash and candidate envelope together", async () => {
@@ -136,6 +152,7 @@ test("vault account commits the new password hash and candidate envelope togethe
     passwordHash,
     envelope: existing.envelope,
     audit: [],
+    sessionsValidAfter: null,
   });
 
   await performPasswordChange(
@@ -151,7 +168,14 @@ test("vault account commits the new password hash and candidate envelope togethe
   assert.equal(harness.commits(), 1);
   assert.equal(await verifyPassword("new-account-password", harness.state().passwordHash), true);
   assert.deepEqual(harness.state().envelope, candidate.envelope);
-  assert.deepEqual(harness.state().audit, ["password.changed:user@example.com"]);
+  assert.deepEqual(harness.state().audit, [
+    "password.changed:user@example.com",
+    "session.invalidated:user@example.com",
+  ]);
+  assert.equal(
+    harness.state().sessionsValidAfter?.toISOString(),
+    "2026-09-21T12:00:00.500Z",
+  );
 });
 
 test("audit failure rolls back both the password hash and vault envelope", async () => {
@@ -164,6 +188,7 @@ test("audit failure rolls back both the password hash and vault envelope", async
       passwordHash,
       envelope: existing.envelope,
       audit: [],
+      sessionsValidAfter: null,
     },
     { auditFails: true },
   );
@@ -184,6 +209,7 @@ test("audit failure rolls back both the password hash and vault envelope", async
   assert.equal(harness.commits(), 0);
   assert.equal(harness.state().passwordHash, passwordHash);
   assert.deepEqual(harness.state().envelope, existing.envelope);
+  assert.equal(harness.state().sessionsValidAfter, null);
   assert.deepEqual(harness.state().audit, []);
 });
 
@@ -195,6 +221,7 @@ test("vault rotation rejects replayed envelope randomness before any write", asy
     passwordHash,
     envelope: existing.envelope,
     audit: [],
+    sessionsValidAfter: null,
   });
 
   await assert.rejects(
@@ -226,6 +253,7 @@ test("vault-envelope presence must match the account state", async () => {
     passwordHash,
     envelope: existing.envelope,
     audit: [],
+    sessionsValidAfter: null,
   });
   await assert.rejects(
     performPasswordChange(
@@ -245,6 +273,7 @@ test("vault-envelope presence must match the account state", async () => {
     passwordHash,
     envelope: null,
     audit: [],
+    sessionsValidAfter: null,
   });
   await assert.rejects(
     performPasswordChange(
