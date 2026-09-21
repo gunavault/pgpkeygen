@@ -9,6 +9,7 @@ import { pgpKeys } from "@/lib/db/schema";
 import { logAudit } from "@/lib/audit";
 import { escrowColumns } from "@/lib/escrow-storage";
 import { canCreateKey, parseMaxKeysPerUser } from "@/lib/key-quota";
+import { evaluateKeyImportPolicy } from "@/lib/key-import-policy";
 import { validateKeyMaterial } from "@/lib/pgp-validation";
 import { chooseRevocationCertificate } from "@/lib/revocation-policy";
 
@@ -71,6 +72,111 @@ export async function saveKey(input: {
   }
 
   revalidatePath("/dashboard");
+}
+
+
+export type ImportKeyResult =
+  | { ok: true }
+  | { ok: false; error: "invalid" | "duplicate" | "limit" | "server" };
+
+export async function importKey(input: {
+  title: string;
+  details: string | null;
+  publicKey: string;
+  privateKey: string;
+  escrow?: unknown;
+}): Promise<ImportKeyResult> {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.email) throw new Error("Unauthorized");
+
+  const title = input.title.trim();
+  const details = input.details?.trim() || null;
+  if (!title || title.length > 255 || (details?.length ?? 0) > 4_000) {
+    return { ok: false, error: "invalid" };
+  }
+
+  let metadata: Awaited<ReturnType<typeof validateKeyMaterial>>;
+  let escrow: ReturnType<typeof escrowColumns>;
+  try {
+    metadata = await validateKeyMaterial(input.publicKey, input.privateKey);
+    escrow = escrowColumns(input.escrow ?? null);
+  } catch {
+    return { ok: false, error: "invalid" };
+  }
+
+  const recoveryEnabled = escrow.escrowVersion !== null;
+  const maxKeys = parseMaxKeysPerUser(process.env.MAX_KEYS_PER_USER);
+
+  try {
+    const policy = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${session.user.id}))`,
+      );
+
+      const [duplicate] = await tx
+        .select({ id: pgpKeys.id })
+        .from(pgpKeys)
+        .where(
+          and(
+            eq(pgpKeys.userId, session.user.id),
+            eq(pgpKeys.fingerprint, metadata.fingerprint),
+          ),
+        )
+        .limit(1);
+
+      const [usage] = await tx
+        .select({ total: count(pgpKeys.id) })
+        .from(pgpKeys)
+        .where(eq(pgpKeys.userId, session.user.id));
+
+      const importPolicy = evaluateKeyImportPolicy(
+        Number(usage?.total ?? 0),
+        maxKeys,
+        Boolean(duplicate),
+      );
+      if (importPolicy !== "allowed") return importPolicy;
+
+      await tx.insert(pgpKeys).values({
+        userId: session.user.id,
+        title,
+        details,
+        name: metadata.name,
+        email: metadata.email,
+        algorithm: metadata.algorithm,
+        expiresAt: metadata.expiresAt,
+        fingerprint: metadata.fingerprint,
+        publicKey: input.publicKey,
+        privateKey: input.privateKey,
+        ...escrow,
+      });
+
+      return "allowed" as const;
+    });
+
+    if (policy === "duplicate") return { ok: false, error: "duplicate" };
+    if (policy === "limit") return { ok: false, error: "limit" };
+
+    await logAudit(
+      session.user.email,
+      "key.imported",
+      title,
+      `fingerprint: ${metadata.fingerprint}`,
+    );
+    if (recoveryEnabled) {
+      await logAudit(
+        session.user.email,
+        "recovery.enabled",
+        title,
+        `fingerprint: ${metadata.fingerprint}`,
+      );
+    }
+
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch {
+    console.error("key import failed");
+    return { ok: false, error: "server" };
+  }
 }
 
 export async function getLegacyRevocationCertificate(keyId: string): Promise<string | null> {
