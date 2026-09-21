@@ -36,18 +36,18 @@ export async function saveKey(input: {
 
   await db.transaction(async (tx) => {
     // Serialize creation per user so concurrent requests cannot race past the quota.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${session.user.id}))`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${userId}))`);
     const [usage] = await tx
       .select({ total: count(pgpKeys.id) })
       .from(pgpKeys)
-      .where(eq(pgpKeys.userId, session.user.id));
+      .where(eq(pgpKeys.userId, userId));
 
     if (!canCreateKey(Number(usage?.total ?? 0), maxKeys)) {
       throw new Error("Key limit reached");
     }
 
     await tx.insert(pgpKeys).values({
-      userId: session.user.id,
+      userId: userId,
       title,
       details,
       name: metadata.name,
@@ -88,6 +88,8 @@ export async function importKey(input: {
 }): Promise<ImportKeyResult> {
   const session = await auth();
   if (!session?.user?.id || !session.user.email) throw new Error("Unauthorized");
+  const userId = userId;
+  const actorEmail = session.user.email;
 
   const title = input.title.trim();
   const details = input.details?.trim() || null;
@@ -110,7 +112,7 @@ export async function importKey(input: {
   try {
     const policy = await db.transaction(async (tx) => {
       await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtext(${session.user.id}))`,
+        sql`select pg_advisory_xact_lock(hashtext(${userId}))`,
       );
 
       const [duplicate] = await tx
@@ -118,7 +120,7 @@ export async function importKey(input: {
         .from(pgpKeys)
         .where(
           and(
-            eq(pgpKeys.userId, session.user.id),
+            eq(pgpKeys.userId, userId),
             eq(pgpKeys.fingerprint, metadata.fingerprint),
           ),
         )
@@ -127,7 +129,7 @@ export async function importKey(input: {
       const [usage] = await tx
         .select({ total: count(pgpKeys.id) })
         .from(pgpKeys)
-        .where(eq(pgpKeys.userId, session.user.id));
+        .where(eq(pgpKeys.userId, userId));
 
       const importPolicy = evaluateKeyImportPolicy(
         Number(usage?.total ?? 0),
@@ -137,7 +139,7 @@ export async function importKey(input: {
       if (importPolicy !== "allowed") return importPolicy;
 
       await tx.insert(pgpKeys).values({
-        userId: session.user.id,
+        userId: userId,
         title,
         details,
         name: metadata.name,
@@ -157,14 +159,14 @@ export async function importKey(input: {
     if (policy === "limit") return { ok: false, error: "limit" };
 
     await logAudit(
-      session.user.email,
+      actorEmail,
       "key.imported",
       title,
       `fingerprint: ${metadata.fingerprint}`,
     );
     if (recoveryEnabled) {
       await logAudit(
-        session.user.email,
+        actorEmail,
         "recovery.enabled",
         title,
         `fingerprint: ${metadata.fingerprint}`,
@@ -190,7 +192,7 @@ export async function getLegacyRevocationCertificate(keyId: string): Promise<str
       revocationCertificate: pgpKeys.revocationCertificate,
     })
     .from(pgpKeys)
-    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, session.user.id)))
+    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, userId)))
     .limit(1);
 
   if (!key) throw new Error("Not found");
@@ -217,7 +219,7 @@ export async function forgetLegacyRevocationCertificate(keyId: string): Promise<
     .where(
       and(
         eq(pgpKeys.id, keyId),
-        eq(pgpKeys.userId, session.user.id),
+        eq(pgpKeys.userId, userId),
         isNotNull(pgpKeys.revocationCertificate),
       ),
     )
@@ -241,7 +243,7 @@ export async function deleteKey(keyId: string) {
 
   const [deleted] = await db
     .delete(pgpKeys)
-    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, session.user.id)))
+    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, userId)))
     .returning({ title: pgpKeys.title, fingerprint: pgpKeys.fingerprint });
 
   if (deleted) {
@@ -258,7 +260,7 @@ export async function revokeKey(keyId: string, suppliedCertificate: string | nul
   const [key] = await db
     .select()
     .from(pgpKeys)
-    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, session.user.id)))
+    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, userId)))
     .limit(1);
 
   if (!key) throw new Error("Not found");
@@ -278,7 +280,7 @@ export async function revokeKey(keyId: string, suppliedCertificate: string | nul
   await db
     .update(pgpKeys)
     .set({ publicKey: revokedPublicKey, revokedAt: new Date(), revocationCertificate: null })
-    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, session.user.id)));
+    .where(and(eq(pgpKeys.id, keyId), eq(pgpKeys.userId, userId)));
 
   await logAudit(session.user.email!, "key.revoked", key.title, `fingerprint: ${key.fingerprint}`);
 
