@@ -5,8 +5,8 @@ import * as openpgp from "openpgp";
 import { revalidatePath } from "next/cache";
 import { auth, signOut } from "@/auth";
 import { db } from "@/lib/db";
-import { pgpKeys } from "@/lib/db/schema";
-import { logAudit } from "@/lib/audit";
+import { auditLog, pgpKeys } from "@/lib/db/schema";
+import { logAudit, type AuditWriter } from "@/lib/audit";
 import { escrowColumns } from "@/lib/escrow-storage";
 import { canCreateKey, parseMaxKeysPerUser } from "@/lib/key-quota";
 import { evaluateKeyImportPolicy } from "@/lib/key-import-policy";
@@ -138,8 +138,14 @@ export async function importKey(input: {
       );
       if (importPolicy !== "allowed") return importPolicy;
 
+      const transactionAuditWriter: AuditWriter = {
+        async write(entry) {
+          await tx.insert(auditLog).values(entry);
+        },
+      };
+
       await tx.insert(pgpKeys).values({
-        userId: userId,
+        userId,
         title,
         details,
         name: metadata.name,
@@ -152,26 +158,28 @@ export async function importKey(input: {
         ...escrow,
       });
 
+      await logAudit(
+        actorEmail,
+        "key.imported",
+        title,
+        `fingerprint: ${metadata.fingerprint}`,
+        transactionAuditWriter,
+      );
+      if (recoveryEnabled) {
+        await logAudit(
+          actorEmail,
+          "recovery.enabled",
+          title,
+          `fingerprint: ${metadata.fingerprint}`,
+          transactionAuditWriter,
+        );
+      }
+
       return "allowed" as const;
     });
 
     if (policy === "duplicate") return { ok: false, error: "duplicate" };
     if (policy === "limit") return { ok: false, error: "limit" };
-
-    await logAudit(
-      actorEmail,
-      "key.imported",
-      title,
-      `fingerprint: ${metadata.fingerprint}`,
-    );
-    if (recoveryEnabled) {
-      await logAudit(
-        actorEmail,
-        "recovery.enabled",
-        title,
-        `fingerprint: ${metadata.fingerprint}`,
-      );
-    }
 
     revalidatePath("/dashboard");
     return { ok: true };
