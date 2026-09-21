@@ -28,3 +28,28 @@ export function expiryStatusPriority(status: KeyExpiryStatus): number {
       return 3;
   }
 }
+
+
+export type ExpirableKey = {
+  expiresAt: Date | null;
+  createdAt: Date;
+};
+
+export function prioritizeKeysByExpiry<T extends ExpirableKey>(
+  keys: readonly T[],
+  now: Date = new Date(),
+): Array<{ key: T; expiryStatus: KeyExpiryStatus }> {
+  return keys
+    .map((key) => ({
+      key,
+      expiryStatus: classifyKeyExpiry(key.expiresAt, now),
+    }))
+    .sort((left, right) => {
+      const priority =
+        expiryStatusPriority(left.expiryStatus) -
+        expiryStatusPriority(right.expiryStatus);
+      if (priority !== 0) return priority;
+
+      return right.key.createdAt.getTime() - left.key.createdAt.getTime();
+    });
+}
