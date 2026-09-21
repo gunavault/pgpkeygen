@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import * as openpgp from "openpgp";
+import { verifyImportedKeyRecoverySecret } from "@/lib/key-import-client";
 import { RecoveryOptInControl } from "./RecoveryOptInControl";
 import { importKey } from "./actions";
 import { useKeyEscrow } from "./useKeyEscrow";
@@ -33,25 +33,13 @@ export function ImportKeyForm() {
           return;
         }
 
-        const [publicKeyObject, privateKeyObject] = await Promise.all([
-          openpgp.readKey({ armoredKey: publicKey }),
-          openpgp.readPrivateKey({ armoredKey: privateKey }),
-        ]);
-
-        if (publicKeyObject.getFingerprint() !== privateKeyObject.getFingerprint()) {
-          setStatus("Public and private key material do not represent the same key.");
-          return;
-        }
-
-        await openpgp.decryptKey({
-          privateKey: privateKeyObject,
-          passphrase: recoverySecret,
-        });
-
-        escrow = await createEscrow(
+        const fingerprint = await verifyImportedKeyRecoverySecret(
+          publicKey,
+          privateKey,
           recoverySecret,
-          publicKeyObject.getFingerprint(),
         );
+
+        escrow = await createEscrow(recoverySecret, fingerprint);
       }
 
       const result = await importKey({
