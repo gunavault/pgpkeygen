@@ -9,7 +9,7 @@ import { auditLog, pgpKeys } from "@/lib/db/schema";
 import { logAudit, type AuditWriter } from "@/lib/audit";
 import { escrowColumns } from "@/lib/escrow-storage";
 import { canCreateKey, parseMaxKeysPerUser } from "@/lib/key-quota";
-import { evaluateKeyImportPolicy } from "@/lib/key-import-policy";
+import { performKeyImportTransaction } from "@/lib/key-import-transaction";
 import { validateKeyMaterial } from "@/lib/pgp-validation";
 import { chooseRevocationCertificate } from "@/lib/revocation-policy";
 
@@ -110,73 +110,84 @@ export async function importKey(input: {
   const maxKeys = parseMaxKeysPerUser(process.env.MAX_KEYS_PER_USER);
 
   try {
-    const policy = await db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtext(${userId}))`,
-      );
-
-      const [duplicate] = await tx
-        .select({ id: pgpKeys.id })
-        .from(pgpKeys)
-        .where(
-          and(
-            eq(pgpKeys.userId, userId),
-            eq(pgpKeys.fingerprint, metadata.fingerprint),
-          ),
-        )
-        .limit(1);
-
-      const [usage] = await tx
-        .select({ total: count(pgpKeys.id) })
-        .from(pgpKeys)
-        .where(eq(pgpKeys.userId, userId));
-
-      const importPolicy = evaluateKeyImportPolicy(
-        Number(usage?.total ?? 0),
-        maxKeys,
-        Boolean(duplicate),
-      );
-      if (importPolicy !== "allowed") return importPolicy;
-
-      const transactionAuditWriter: AuditWriter = {
-        async write(entry) {
-          await tx.insert(auditLog).values(entry);
-        },
-      };
-
-      await tx.insert(pgpKeys).values({
+    const policy = await performKeyImportTransaction(
+      {
         userId,
-        title,
-        details,
-        name: metadata.name,
-        email: metadata.email,
-        algorithm: metadata.algorithm,
-        expiresAt: metadata.expiresAt,
         fingerprint: metadata.fingerprint,
-        publicKey: input.publicKey,
-        privateKey: input.privateKey,
-        ...escrow,
-      });
+      },
+      {
+        maxKeys,
+        transaction: (callback) =>
+          db.transaction(async (tx) => {
+            const transactionAuditWriter: AuditWriter = {
+              async write(entry) {
+                await tx.insert(auditLog).values(entry);
+              },
+            };
 
-      await logAudit(
-        actorEmail,
-        "key.imported",
-        title,
-        `fingerprint: ${metadata.fingerprint}`,
-        transactionAuditWriter,
-      );
-      if (recoveryEnabled) {
-        await logAudit(
-          actorEmail,
-          "recovery.enabled",
-          title,
-          `fingerprint: ${metadata.fingerprint}`,
-          transactionAuditWriter,
-        );
-      }
-
-      return "allowed" as const;
-    });
+            return callback({
+              async lockUser(lockedUserId) {
+                await tx.execute(
+                  sql`select pg_advisory_xact_lock(hashtext(${lockedUserId}))`,
+                );
+              },
+              async hasDuplicateFingerprint(checkedUserId, fingerprint) {
+                const [duplicate] = await tx
+                  .select({ id: pgpKeys.id })
+                  .from(pgpKeys)
+                  .where(
+                    and(
+                      eq(pgpKeys.userId, checkedUserId),
+                      eq(pgpKeys.fingerprint, fingerprint),
+                    ),
+                  )
+                  .limit(1);
+                return Boolean(duplicate);
+              },
+              async countKeys(countedUserId) {
+                const [usage] = await tx
+                  .select({ total: count(pgpKeys.id) })
+                  .from(pgpKeys)
+                  .where(eq(pgpKeys.userId, countedUserId));
+                return Number(usage?.total ?? 0);
+              },
+              async insertKey() {
+                await tx.insert(pgpKeys).values({
+                  userId,
+                  title,
+                  details,
+                  name: metadata.name,
+                  email: metadata.email,
+                  algorithm: metadata.algorithm,
+                  expiresAt: metadata.expiresAt,
+                  fingerprint: metadata.fingerprint,
+                  publicKey: input.publicKey,
+                  privateKey: input.privateKey,
+                  ...escrow,
+                });
+              },
+              async auditImport() {
+                await logAudit(
+                  actorEmail,
+                  "key.imported",
+                  title,
+                  `fingerprint: ${metadata.fingerprint}`,
+                  transactionAuditWriter,
+                );
+                if (recoveryEnabled) {
+                  await logAudit(
+                    actorEmail,
+                    "recovery.enabled",
+                    title,
+                    `fingerprint: ${metadata.fingerprint}`,
+                    transactionAuditWriter,
+                  );
+                }
+              },
+            });
+          }),
+      },
+    );
 
     if (policy === "duplicate") return { ok: false, error: "duplicate" };
     if (policy === "limit") return { ok: false, error: "limit" };
