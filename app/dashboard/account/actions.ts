@@ -10,6 +10,7 @@ import { escrowPayloadFromRow, vaultEnvelopeColumns, vaultEnvelopeFromRow } from
 import { performPasswordChange, type PasswordChangeEnvironment } from "@/lib/password-change";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
+import { performSessionInvalidation, type SessionInvalidationEnvironment } from "@/lib/session-invalidation";
 import type { EscrowVerificationSample } from "@/lib/vault-rotation";
 import type { VaultEnvelope } from "@/lib/vault-escrow";
 
@@ -101,17 +102,19 @@ export async function changePassword(input: {
           if (envelope) {
             await tx
               .update(users)
-              .set({
-                passwordHash,
-                sessionsValidAfter: new Date(),
-                ...vaultEnvelopeColumns(envelope),
-              })
+              .set({ passwordHash, ...vaultEnvelopeColumns(envelope) })
               .where(eq(users.id, userId));
             return;
           }
           await tx
             .update(users)
-            .set({ passwordHash, sessionsValidAfter: new Date() })
+            .set({ passwordHash })
+            .where(eq(users.id, userId));
+        },
+        async invalidateSessions(userId) {
+          await tx
+            .update(users)
+            .set({ sessionsValidAfter: new Date() })
             .where(eq(users.id, userId));
         },
         async auditPasswordChanged(email) {
@@ -122,6 +125,8 @@ export async function changePassword(input: {
             undefined,
             transactionAuditWriter,
           );
+        },
+        async auditSessionsInvalidated(email) {
           await logAudit(
             email,
             "session.invalidated",
@@ -158,27 +163,43 @@ export async function changePassword(input: {
 export async function invalidateAllSessions(): Promise<void> {
   const session = await auth();
   if (!session?.user?.id || !session.user.email) throw new Error("Unauthorized");
-  const userId = session.user.id;
-  const actorEmail = session.user.email;
 
-  await db.transaction(async (tx) => {
-    const transactionAuditWriter: AuditWriter = {
-      async write(entry) {
-        await tx.insert(auditLog).values(entry);
-      },
-    };
+  const environment: SessionInvalidationEnvironment = {
+    now: () => new Date(),
+    transaction: (callback) =>
+      db.transaction(async (tx) => {
+        const transactionAuditWriter: AuditWriter = {
+          async write(entry) {
+            await tx.insert(auditLog).values(entry);
+          },
+        };
 
-    await tx
-      .update(users)
-      .set({ sessionsValidAfter: new Date() })
-      .where(eq(users.id, userId));
+        return callback({
+          async advanceCutoff(userId, cutoff) {
+            await tx
+              .update(users)
+              .set({ sessionsValidAfter: cutoff })
+              .where(eq(users.id, userId));
+          },
+          async auditInvalidated(email, reason) {
+            await logAudit(
+              email,
+              "session.invalidated",
+              undefined,
+              `reason: ${reason}`,
+              transactionAuditWriter,
+            );
+          },
+        });
+      }),
+  };
 
-    await logAudit(
-      actorEmail,
-      "session.invalidated",
-      undefined,
-      "reason: user requested sign out everywhere",
-      transactionAuditWriter,
-    );
-  });
+  await performSessionInvalidation(
+    {
+      userId: session.user.id,
+      actorEmail: session.user.email,
+      reason: "user requested sign out everywhere",
+    },
+    environment,
+  );
 }
