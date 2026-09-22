@@ -27,22 +27,14 @@ test("browser verifies vault continuity before submitting password rotation", ()
   assert.match(form, /prepareVerifiedVaultRewrap[\s\S]*await changePassword/);
 });
 
-test("server password action owns credentials but not browser vault crypto", () => {
-  assert.match(actions, /performPasswordChange/);
+test("server password action delegates tested request policy and owns credentials, not browser vault crypto", () => {
+  assert.match(actions, /handlePasswordChangeRequest/);
   assert.match(actions, /verifyPassword/);
   assert.match(actions, /hashPassword/);
   assert.doesNotMatch(
     actions,
     /unwrapVaultEnvelope|rewrapVaultEnvelope|unwrapEscrowSecret|wrapEscrowSecret/,
   );
-});
-
-test("password-change endpoint is throttled by account and source and audits failed verification", () => {
-  assert.match(actions, /isRateLimited/);
-  assert.match(actions, /password-change:account:/);
-  assert.match(actions, /password-change:source:/);
-  assert.match(actions, /password\.change_failed/);
-  assert.match(actions, /current password[\s\S]*password\.change_failed/i);
 });
 
 test("password-change UI reports throttling without exposing another verification oracle", () => {
