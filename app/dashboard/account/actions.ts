@@ -5,18 +5,18 @@ import { auth } from "@/auth";
 import { logAudit, type AuditWriter } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { auditLog, pgpKeys, users } from "@/lib/db/schema";
-import { parseVaultEnvelopeInput } from "@/lib/escrow-record";
 import { escrowPayloadFromRow, vaultEnvelopeColumns, vaultEnvelopeFromRow } from "@/lib/escrow-storage";
-import { performPasswordChange, type PasswordChangeEnvironment } from "@/lib/password-change";
+import {
+  handlePasswordChangeRequest,
+  type ChangePasswordResult,
+  type PasswordChangeRequestEnvironment,
+} from "@/lib/password-change-request";
+export type { ChangePasswordResult };
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import { performSessionInvalidation, type SessionInvalidationEnvironment } from "@/lib/session-invalidation";
 import type { EscrowVerificationSample } from "@/lib/vault-rotation";
 import type { VaultEnvelope } from "@/lib/vault-escrow";
-
-const PASSWORD_CHANGE_ACCOUNT_LIMIT = 5;
-const PASSWORD_CHANGE_SOURCE_LIMIT = 30;
-const PASSWORD_CHANGE_WINDOW_MS = 15 * 60 * 1000;
 
 const envelopeProjection = {
   vaultWrappedKey: users.vaultWrappedKey,
@@ -30,10 +30,6 @@ export type PasswordChangeContext = {
   envelope: VaultEnvelope | null;
   sample: EscrowVerificationSample | null;
 };
-
-export type ChangePasswordResult =
-  | { ok: true }
-  | { ok: false; error: "invalid" | "current-password" | "vault" | "ratelimited" | "server" };
 
 export async function getPasswordChangeContext(): Promise<PasswordChangeContext> {
   const session = await auth();
@@ -66,37 +62,42 @@ export async function changePassword(input: {
 }): Promise<ChangePasswordResult> {
   const session = await auth();
   if (!session?.user?.id || !session.user.email) throw new Error("Unauthorized");
-  const actorEmail = session.user.email;
 
   const ip = await getClientIp();
-  const accountLimited = isRateLimited(`password-change:account:${session.user.id}`, PASSWORD_CHANGE_ACCOUNT_LIMIT, PASSWORD_CHANGE_WINDOW_MS);
-  const sourceLimited = ip ? isRateLimited(`password-change:source:${ip}`, PASSWORD_CHANGE_SOURCE_LIMIT, PASSWORD_CHANGE_WINDOW_MS) : false;
-  if (accountLimited || sourceLimited) return { ok: false, error: "ratelimited" };
 
-  const currentPassword = input.currentPassword;
-  const newPassword = input.newPassword;
-  if (typeof currentPassword !== "string" || typeof newPassword !== "string" || !currentPassword || newPassword.length < 8) {
-    return { ok: false, error: "invalid" };
-  }
-
-  let newEnvelope: VaultEnvelope | null;
-  try {
-    newEnvelope = input.newEnvelope === null ? null : parseVaultEnvelopeInput(input.newEnvelope);
-  } catch {
-    return { ok: false, error: "vault" };
-  }
-
-  const environment: PasswordChangeEnvironment = {
+  const environment: PasswordChangeRequestEnvironment = {
     verifyPassword,
     hashPassword,
+    isRateLimited,
+    async auditPasswordChangeFailed(email) {
+      await logAudit(email, "password.change_failed");
+    },
     transaction: (callback) => db.transaction(async (tx) => {
-      const transactionAuditWriter: AuditWriter = { async write(entry) { await tx.insert(auditLog).values(entry); } };
+      const transactionAuditWriter: AuditWriter = {
+        async write(entry) {
+          await tx.insert(auditLog).values(entry);
+        },
+      };
       return callback({
         async loadAccountForUpdate(userId) {
-          await tx.execute(sql`select ${users.id} from ${users} where ${users.id} = ${userId} for update`);
-          const [row] = await tx.select({ email: users.email, passwordHash: users.passwordHash, ...envelopeProjection }).from(users).where(eq(users.id, userId)).limit(1);
+          await tx.execute(
+            sql`select ${users.id} from ${users} where ${users.id} = ${userId} for update`,
+          );
+          const [row] = await tx
+            .select({
+              email: users.email,
+              passwordHash: users.passwordHash,
+              ...envelopeProjection,
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
           if (!row) return null;
-          return { email: row.email, passwordHash: row.passwordHash, envelope: vaultEnvelopeFromRow(row) };
+          return {
+            email: row.email,
+            passwordHash: row.passwordHash,
+            envelope: vaultEnvelopeFromRow(row),
+          };
         },
         async updateCredentials(userId, passwordHash, envelope) {
           if (envelope) {
@@ -139,26 +140,16 @@ export async function changePassword(input: {
     }),
   };
 
-  try {
-    await performPasswordChange({ userId: session.user.id, currentPassword, newPassword, newEnvelope }, environment);
-    return { ok: true };
-  } catch (error) {
-    if (error instanceof Error) {
-      if (/current password/i.test(error.message)) {
-        try {
-          await logAudit(actorEmail, "password.change_failed");
-        } catch {
-          console.error("password change failure audit failed");
-        }
-        return { ok: false, error: "current-password" };
-      }
-      if (/vault envelope|fresh vault envelope/i.test(error.message)) return { ok: false, error: "vault" };
-    }
-    console.error("password change failed");
-    return { ok: false, error: "server" };
-  }
+  return handlePasswordChangeRequest(
+    {
+      userId: session.user.id,
+      actorEmail: session.user.email,
+      sourceIp: ip,
+    },
+    input,
+    environment,
+  );
 }
-
 
 export async function invalidateAllSessions(): Promise<void> {
   const session = await auth();

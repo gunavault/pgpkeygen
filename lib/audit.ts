@@ -6,6 +6,7 @@ export type AuditAction =
   | "login.success"
   | "login.failed"
   | "key.generated"
+  | "key.imported"
   | "key.revoked"
   | "key.deleted"
   | "recovery.accessed"
