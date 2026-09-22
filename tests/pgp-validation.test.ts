@@ -26,6 +26,29 @@ test("derives authoritative metadata from a matching encrypted key pair", async 
   assert.ok(metadata.expiresAt instanceof Date);
 });
 
+test("derives identity from the primary user instead of packet order", async () => {
+  const generated = await openpgp.generateKey({
+    type: "curve25519",
+    userIDs: [
+      { name: "Legacy Contact", email: "old@acme.test" },
+      { name: "Acme Client", email: "ops@acme.test" },
+    ],
+    passphrase: "strong-test-passphrase",
+    format: "armored",
+  });
+
+  const parsed = await openpgp.readKey({ armoredKey: generated.publicKey });
+  const { user: primaryUser } = await parsed.getPrimaryUser();
+  const primaryUserId = primaryUser.userID?.userID;
+  assert.ok(primaryUserId);
+
+  const metadata = await validateKeyMaterial(generated.publicKey, generated.privateKey);
+  const match = primaryUserId.match(/^\s*(.*?)\s*<([^<>\s]+@[^<>\s]+)>\s*$/);
+  assert.ok(match);
+  assert.equal(metadata.name, match[1].trim());
+  assert.equal(metadata.email, match[2].trim().toLowerCase());
+});
+
 test("rejects a private key that does not match the public key", async () => {
   const first = await generate();
   const second = await generate();
