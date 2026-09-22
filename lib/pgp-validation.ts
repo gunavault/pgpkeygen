@@ -49,10 +49,9 @@ export async function validateKeyMaterial(
     throw new Error("Public and private material must represent the same key pair");
   }
 
-  // Forces verification of the key's primary self-certification. Invalid keys fail here.
-  await publicKey.getPrimaryUser();
-
-  const primaryUserId = publicKey.getUserIDs()[0];
+  // Verifies the primary self-certification and returns the authoritative identity.
+  const { user: primaryUser } = await publicKey.getPrimaryUser();
+  const primaryUserId = primaryUser.userID?.userID;
   if (!primaryUserId) throw new Error("PGP key must contain a user identity");
   const identity = parseUserId(primaryUserId);
 
