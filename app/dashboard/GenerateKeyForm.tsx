@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import * as openpgp from "openpgp";
+import { keyExportFilenames } from "@/lib/key-export";
 import { generatePassphrase } from "@/lib/passphrase";
 import { CopyButton } from "./CopyButton";
+import { DownloadButton } from "./DownloadButton";
 import { RecoveryOptInControl } from "./RecoveryOptInControl";
 import { saveKey } from "./actions";
 import { useKeyEscrow } from "./useKeyEscrow";
@@ -130,7 +132,7 @@ export function GenerateKeyForm() {
         )}
 
         <div className="field">
-          <div className="flex items-center justify-between mb-2"><label htmlFor="generated-revocation">Revocation certificate</label><CopyButton text={revocationCertificate} /></div>
+          <div className="flex items-center justify-between mb-2"><label htmlFor="generated-revocation">Revocation certificate</label><div className="flex items-center gap-3"><CopyButton text={revocationCertificate} /><DownloadButton text={revocationCertificate} filename={keyExportFilenames(name, pendingKey.fingerprint).revocationCertificate} /></div></div>
           <textarea id="generated-revocation" value={revocationCertificate} readOnly rows={8} className="input mono text-xs" />
           <p className="text-xs text-muted m-0 mt-2">Keep this separately. Anyone who obtains it can permanently revoke this key.</p>
         </div>

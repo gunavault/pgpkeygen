@@ -4,7 +4,9 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
 import { prioritizeKeysByExpiry } from "@/lib/key-expiry";
+import { keyExportFilenames } from "@/lib/key-export";
 import { CopyButton } from "./CopyButton";
+import { DownloadButton } from "./DownloadButton";
 import { KeyActions } from "./KeyActions";
 
 function fingerprintPretty(fp: string) {
@@ -64,8 +66,8 @@ export default async function DashboardPage() {
                 </div>
 
                 <div className="mt-4"><div style={{ ...kicker, marginBottom: 8 }}>Fingerprint</div><div className="mono text-[13px] px-3.5 py-3" style={{ background: "var(--color-neutral-200)", border: "1px solid var(--color-divider)", letterSpacing: ".03em", wordBreak: "break-all" }}>{fingerprintPretty(key.fingerprint)}</div></div>
-                <div className="mt-4"><div className="flex items-center justify-between mb-2"><span style={kicker}>Public key</span><CopyButton text={key.publicKey} /></div><pre className="mono keyblock text-[11px] leading-[1.55] px-3.5 py-3 overflow-auto whitespace-pre-wrap m-0" style={{ background: "var(--color-neutral-200)", border: "1px solid var(--color-divider)", maxHeight: 150, wordBreak: "break-all" }}>{key.publicKey}</pre></div>
-                <div className="mt-4"><div className="flex items-center justify-between mb-2"><span style={kicker}>Private key</span><CopyButton text={key.privateKey} /></div><pre className="mono keyblock text-[11px] leading-[1.55] px-3.5 py-3 overflow-auto whitespace-pre-wrap m-0" style={{ background: "var(--color-neutral-900)", color: "var(--color-neutral-300)", border: "1px solid var(--color-neutral-900)", maxHeight: 150, wordBreak: "break-all" }}>{key.privateKey}</pre></div>
+                <div className="mt-4"><div className="flex items-center justify-between mb-2"><span style={kicker}>Public key</span><div className="flex items-center gap-3"><CopyButton text={key.publicKey} /><DownloadButton text={key.publicKey} filename={keyExportFilenames(key.name, key.fingerprint).publicKey} /></div></div><pre className="mono keyblock text-[11px] leading-[1.55] px-3.5 py-3 overflow-auto whitespace-pre-wrap m-0" style={{ background: "var(--color-neutral-200)", border: "1px solid var(--color-divider)", maxHeight: 150, wordBreak: "break-all" }}>{key.publicKey}</pre></div>
+                <div className="mt-4"><div className="flex items-center justify-between mb-2"><span style={kicker}>Private key</span><div className="flex items-center gap-3"><CopyButton text={key.privateKey} /><DownloadButton text={key.privateKey} filename={keyExportFilenames(key.name, key.fingerprint).privateKey} /></div></div><pre className="mono keyblock text-[11px] leading-[1.55] px-3.5 py-3 overflow-auto whitespace-pre-wrap m-0" style={{ background: "var(--color-neutral-900)", color: "var(--color-neutral-300)", border: "1px solid var(--color-neutral-900)", maxHeight: 150, wordBreak: "break-all" }}>{key.privateKey}</pre></div>
 
                 <KeyActions keyId={key.id} isRevoked={!!key.revokedAt} hasLegacyCertificate={!!key.revocationCertificate} hasEscrow={!!key.escrowVersion} />
               </div>
