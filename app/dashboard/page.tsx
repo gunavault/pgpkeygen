@@ -3,11 +3,13 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
+import { filterKeys, normalizeQuery, parseKeyStatusFilter } from "@/lib/key-filter";
 import { prioritizeKeysByExpiry } from "@/lib/key-expiry";
 import { keyExportFilenames } from "@/lib/key-export";
 import { CopyButton } from "./CopyButton";
 import { DownloadButton } from "./DownloadButton";
 import { KeyActions } from "./KeyActions";
+import { KeyFilter } from "./KeyFilter";
 
 function fingerprintPretty(fp: string) {
   return (fp.match(/.{1,4}/g) || []).join(" ");
@@ -15,9 +17,16 @@ function fingerprintPretty(fp: string) {
 
 const kicker = { fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase" as const, color: "var(--color-neutral-500)" };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const session = await auth();
   const userId = session!.user.id;
+  const params = await searchParams;
+  const query = normalizeQuery(params.q);
+  const status = parseKeyStatusFilter(params.status);
 
   const keys = await db
     .select()
@@ -25,7 +34,8 @@ export default async function DashboardPage() {
     .where(eq(pgpKeys.userId, userId))
     .orderBy(desc(pgpKeys.createdAt));
 
-  const prioritizedKeys = prioritizeKeysByExpiry(keys);
+  const visibleKeys = filterKeys(keys, { query, status });
+  const prioritizedKeys = prioritizeKeysByExpiry(visibleKeys);
 
   return (
     <div className="flex flex-col gap-5">
@@ -40,9 +50,22 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
+      {keys.length > 0 && (
+        <KeyFilter query={query} status={status} shown={visibleKeys.length} total={keys.length} />
+      )}
+
       {keys.length === 0 && <p className="text-sm text-muted">No keys yet.</p>}
 
-      {keys.length > 0 && (
+      {keys.length > 0 && visibleKeys.length === 0 && (
+        <p className="text-sm text-muted">
+          No keys match your filters.{" "}
+          <Link href="/dashboard" className="lnk">
+            Clear filters
+          </Link>
+        </p>
+      )}
+
+      {visibleKeys.length > 0 && (
         <div style={{ border: "1px solid var(--color-divider)" }}>
           {prioritizedKeys.map(({ key, expiryStatus }, i) => (
             <details key={key.id} style={{ borderTop: i === 0 ? "none" : "1px solid var(--color-divider)" }}>
