@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys } from "@/lib/db/schema";
+import { prioritizeKeysByExpiry } from "@/lib/key-expiry";
 import { keyExportFilenames } from "@/lib/key-export";
 import { CopyButton } from "./CopyButton";
 import { DownloadButton } from "./DownloadButton";
@@ -24,6 +25,8 @@ export default async function DashboardPage() {
     .where(eq(pgpKeys.userId, userId))
     .orderBy(desc(pgpKeys.createdAt));
 
+  const prioritizedKeys = prioritizeKeysByExpiry(keys);
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-end justify-between">
@@ -41,10 +44,12 @@ export default async function DashboardPage() {
 
       {keys.length > 0 && (
         <div style={{ border: "1px solid var(--color-divider)" }}>
-          {keys.map((key, i) => (
+          {prioritizedKeys.map(({ key, expiryStatus }, i) => (
             <details key={key.id} style={{ borderTop: i === 0 ? "none" : "1px solid var(--color-divider)" }}>
               <summary className="keyrow flex items-center gap-3 cursor-pointer px-4 py-3.5">
                 <span className="text-[14.5px] font-bold" style={{ fontFamily: "var(--font-heading)" }}>{key.title}</span>
+                {expiryStatus === "expired" && <span className="tag tag-accent" style={{ fontSize: 9.5 }}>Expired</span>}
+                {expiryStatus === "expiring" && <span className="tag" style={{ fontSize: 9.5 }}>Expiring soon</span>}
                 {key.revokedAt && <span className="tag tag-accent" style={{ fontSize: 9.5 }}>Revoked</span>}
                 {key.escrowVersion && <span className="tag" style={{ fontSize: 9.5 }}>Recovery enabled</span>}
                 {key.revocationCertificate && <span className="tag" style={{ fontSize: 9.5 }}>Legacy revocation copy</span>}

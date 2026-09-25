@@ -73,3 +73,23 @@ test("rejects oversized armored payloads before parsing", async () => {
     /too large/i,
   );
 });
+
+
+test("accepts an already-expired but otherwise valid encrypted key pair", async () => {
+  const generated = await openpgp.generateKey({
+    type: "curve25519",
+    userIDs: [{ name: "Expired Record", email: "expired@example.com" }],
+    passphrase: "strong-test-passphrase",
+    date: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    keyExpirationTime: 60 * 60,
+    format: "armored",
+  });
+
+  const metadata = await validateKeyMaterial(
+    generated.publicKey,
+    generated.privateKey,
+  );
+
+  assert.ok(metadata.expiresAt instanceof Date);
+  assert.ok(metadata.expiresAt.getTime() < Date.now());
+});
