@@ -20,6 +20,18 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Finding keys
+
+The **Your keys** page filters from the URL, so a filtered view can be reloaded
+or shared and works without JavaScript:
+
+- `?q=<text>` matches title, name, email, details, or fingerprint
+  case-insensitively. Spaces in a pasted fingerprint are ignored.
+- `?status=active` or `?status=revoked` narrows to non-revoked or revoked keys.
+  Any other value shows all keys.
+
+Both can be combined, for example `/dashboard?q=release&status=active`.
+
 ## Key secret model
 
 OpenPGP keys are generated in the browser. Private-key passphrase plaintext is never accepted by the key-persistence server action or sent by email.
