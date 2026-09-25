@@ -14,7 +14,8 @@ export type AuditAction =
   | "revocation.exported"
   | "revocation.forgotten"
   | "password.changed"
-  | "password.change_failed";
+  | "password.change_failed"
+  | "session.invalidated";
 
 export type AuditEntry = {
   actorEmail: string;

@@ -1,4 +1,5 @@
 import { PasswordChangeForm } from "./PasswordChangeForm";
+import { SessionInvalidationButton } from "./SessionInvalidationButton";
 
 export default function AccountPage() {
   return (
@@ -24,6 +25,18 @@ export default function AccountPage() {
       </div>
 
       <PasswordChangeForm />
+
+      <div style={{ height: 1, background: "var(--color-divider)" }} />
+
+      <section className="flex flex-col gap-3 max-w-2xl">
+        <div>
+          <h2 className="text-xl m-0">Sessions</h2>
+          <p className="text-sm text-muted mt-2 mb-0">
+            Invalidate every session issued before now. This also signs out this browser.
+          </p>
+        </div>
+        <SessionInvalidationButton />
+      </section>
     </div>
   );
 }

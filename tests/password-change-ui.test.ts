@@ -42,7 +42,8 @@ test("password-change UI reports throttling without exposing another verificatio
   assert.match(form, /Too many password-change attempts/i);
 });
 
-test("password-change UI does not overpromise session invalidation or password reset", () => {
-  assert.match(form, /does not sign out existing sessions/i);
+test("password-change UI explains that password rotation invalidates prior sessions", () => {
+  assert.match(form, /invalidates sessions issued before the change/i);
+  assert.match(form, /sign in again with the new password/i);
   assert.doesNotMatch(form, /reset password|forgot password/i);
 });

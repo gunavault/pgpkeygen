@@ -40,7 +40,11 @@ function createHarness() {
         async updateCredentials() {
           credentialWrites += 1;
         },
+        async invalidateSessions() {},
         async auditPasswordChanged() {
+          transactionAudits += 1;
+        },
+        async auditSessionsInvalidated() {
           transactionAudits += 1;
         },
       });

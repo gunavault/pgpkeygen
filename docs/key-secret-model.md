@@ -49,3 +49,16 @@ Optional recovery does not claim to protect against a fully compromised applicat
 `tests/passphrase-boundary.test.ts` remains the regression guard for the server boundary and is intentionally unchanged. Passphrase plaintext must not be accepted by `app/dashboard/actions.ts`, persisted in the database, logged, or sent through email.
 
 Revocation certificates remain a separate security boundary. New revocation certificates stay client-held under the existing revocation model.
+
+
+## Session invalidation
+
+Authenticated sessions are JWT-backed, but they are not irrevocable until expiry. Each account can carry a nullable `sessions_valid_after` cutoff. A session issued before that cutoff is treated as signed out on its next authenticated request.
+
+Password rotation advances the cutoff in the same database transaction that writes the new password hash and vault envelope. This makes the credential change eject previously issued sessions rather than leaving a stolen token usable after rotation. The account page also exposes **Sign out everywhere**, which advances the same cutoff without changing the password.
+
+New tokens record a millisecond-precision issue time so a password change can distinguish sessions created immediately before and after the cutoff without relying only on JWT second-level `iat` precision. Existing pre-migration tokens fall back to `iat`; once an account has a cutoff, a token without a trustworthy issue time fails closed.
+
+Session validation re-reads the current account role together with the cutoff. Role changes therefore take effect on the next authenticated request rather than waiting for the original JWT to expire.
+
+Session invalidation does not expose or re-encrypt PGP secrets. The audit log records the invalidation event without token, password, vault-key, or escrow material.
