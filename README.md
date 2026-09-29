@@ -30,6 +30,12 @@ Enabling recovery changes the threat model: a stolen database contains material 
 
 ## Deploying with Docker
 
+For a production deployment — TLS termination, registry-based builds, the
+verification checklist and the failure modes real deployments hit — follow
+**[`docs/deployment.md`](docs/deployment.md)**. Note in particular that the
+browser cryptography requires HTTPS: passphrase recovery does not work over
+plain HTTP.
+
 The repo ships a multi-stage `Dockerfile` that builds a self-contained Next.js
 server (`output: "standalone"`) and a `docker-compose.yml` that runs it next to
 Postgres 16. On start the container applies any pending migrations from
