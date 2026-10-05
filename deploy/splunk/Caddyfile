@@ -1,0 +1,13 @@
+# Replace pgp.example.com with the hostname on your certificate.
+# fullchain.pem = your certificate followed by any intermediate certificates.
+pgp.example.com {
+	tls /etc/caddy/certs/fullchain.pem /etc/caddy/certs/privkey.pem
+
+	# Enable once HTTPS is confirmed working for this hostname (see docs/browser-security.md).
+	# header Strict-Transport-Security "max-age=31536000"
+
+	# Caddy replaces any client-sent X-Forwarded-For with the real client IP,
+	# which is what TRUST_PROXY_HEADERS=true relies on. Do not add
+	# trusted_proxies here unless another proxy sits in front of Caddy.
+	reverse_proxy app:3000
+}

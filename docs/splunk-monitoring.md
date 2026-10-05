@@ -93,8 +93,12 @@ changes. Do not add `-v`: that deletes the database volume.
 
 ### 5. Configure Splunk DB Connect
 
-- **Connection:** PostgreSQL, JDBC URL
-  `jdbc:postgresql://<db-ip>:5432/pgpkeygen?sslmode=require`, identity `splunk_ro`.
+- **Connection:** PostgreSQL, identity `splunk_ro`. Prefer a JDBC URL that verifies the
+  server certificate:
+  `jdbc:postgresql://<db-hostname>:5432/pgpkeygen?sslmode=verify-full&sslrootcert=/path/to/root-ca.pem`.
+  `<db-hostname>` must be a name on the certificate that resolves to the database server's
+  private IP from the Splunk server (an internal DNS record or `/etc/hosts` entry). If that
+  is not possible, `sslmode=require` still encrypts but does not check the server's identity.
 - **Input:** batch mode, query `SELECT * FROM soc_key_expiry`, once a day. Each run is a
   full snapshot, so alerts should use the latest run.
 
