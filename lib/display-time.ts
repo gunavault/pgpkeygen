@@ -13,18 +13,8 @@ export function resolveTimeZone(configured: string | undefined): string {
   }
 }
 
-function utcOffsetLabel(date: Date, timeZone: string): string {
-  const name =
-    new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "shortOffset" })
-      .formatToParts(date)
-      .find((part) => part.type === "timeZoneName")?.value ?? "GMT";
-  // "GMT+7" -> "UTC+7", "GMT" -> "UTC"
-  return name.replace(/^GMT/, "UTC");
-}
-
-/** Formats as "2026-10-05 15:43:11 UTC+7" in the given zone. */
-export function formatTimestamp(date: Date, timeZone: string): string {
-  const parts = Object.fromEntries(
+function wallClockParts(date: Date, timeZone: string): Record<string, string> {
+  return Object.fromEntries(
     new Intl.DateTimeFormat("en-CA", {
       timeZone,
       year: "numeric",
@@ -38,7 +28,31 @@ export function formatTimestamp(date: Date, timeZone: string): string {
       .formatToParts(date)
       .map((part) => [part.type, part.value]),
   );
-  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} ${utcOffsetLabel(date, timeZone)}`;
+}
+
+// Computed from the wall clock rather than read from the ICU zone name, whose
+// spelling ("GMT", "GMT+0", ...) differs between Node.js builds.
+function utcOffsetLabel(date: Date, parts: Record<string, string>): string {
+  const wallAsUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  const offsetMinutes = Math.round((wallAsUtc - Math.floor(date.getTime() / 1000) * 1000) / 60000);
+  if (offsetMinutes === 0) return "UTC";
+  const sign = offsetMinutes > 0 ? "+" : "-";
+  const hours = Math.floor(Math.abs(offsetMinutes) / 60);
+  const minutes = Math.abs(offsetMinutes) % 60;
+  return `UTC${sign}${hours}${minutes ? `:${String(minutes).padStart(2, "0")}` : ""}`;
+}
+
+/** Formats as "2026-10-05 15:43:11 UTC+7" in the given zone. */
+export function formatTimestamp(date: Date, timeZone: string): string {
+  const parts = wallClockParts(date, timeZone);
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} ${utcOffsetLabel(date, parts)}`;
 }
 
 export function appTimeZone(): string {
