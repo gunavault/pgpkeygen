@@ -1,6 +1,7 @@
 # Splunk key-expiry monitoring: deployment files
 
-See [`docs/splunk-monitoring.md`](../../docs/splunk-monitoring.md) for the full setup.
+To deploy, follow [`docs/deploy.md`](../../docs/deploy.md). It contains every file below
+verbatim, so nothing has to be copied from here by hand.
 
 - `splunk-role.sql`: creates the read-only `splunk_ro` role. Covered by
   `tests/soc-key-expiry-view.test.ts` against a live PostgreSQL server.
@@ -10,10 +11,12 @@ See [`docs/splunk-monitoring.md`](../../docs/splunk-monitoring.md) for the full 
   `splunk_ro` only from the Splunk server over TLS.
 - `Caddyfile`: TLS termination with your own certificate, proxying to the app.
 
-`10.0.0.5` (database server's private IP), `10.0.0.20` (Splunk server) and `pgp.example.com`
-are placeholders.
+`__SERVER_IP__`, `__SPLUNK_IP__`, `__DOMAIN__` and `__IMAGE_TAG__` are placeholders; step 4e of
+the guide fills them in.
 
 What has been tested, outside Docker: the `pg_hba.conf` rules and Postgres TLS with a
 certificate chain on PostgreSQL 16, and the `Caddyfile` on Caddy 2.10 (including that it
-overwrites a spoofed `X-Forwarded-For`). The compose file itself has not been run. Run the
+overwrites a spoofed `X-Forwarded-For`). The compose file has been run on one RHEL server. Run the
 verification steps in the docs after deploying.
+
+If you change a file here, update the matching block in `docs/deploy.md` so the two stay identical.

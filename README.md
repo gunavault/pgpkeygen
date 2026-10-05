@@ -30,6 +30,9 @@ Enabling recovery changes the threat model: a stolen database contains material 
 
 ## Deploying with Docker
 
+**First production deployment?** Follow [`docs/deploy.md`](docs/deploy.md): a copy-paste
+guide from a fresh server to HTTPS, the database locked down, and Splunk connected.
+
 The repo ships a multi-stage `Dockerfile` that builds a self-contained Next.js
 server (`output: "standalone"`) and a `docker-compose.yml` that runs it next to
 Postgres 16. On start the container applies any pending migrations from

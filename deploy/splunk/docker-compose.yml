@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/gunavault/pgpkeygen:1.1.0
+    image: ghcr.io/gunavault/pgpkeygen:__IMAGE_TAG__
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
@@ -34,8 +34,8 @@ services:
       - -c
       - ssl_key_file=/etc/postgresql/certs/server.key
     ports:
-      # Replace with this server's PRIVATE IP. Never use bare "5432:5432".
-      - "10.0.0.5:5432:5432"
+      # This server's PRIVATE IP only. Never use bare "5432:5432".
+      - "__SERVER_IP__:5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-pgpkeygen}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}

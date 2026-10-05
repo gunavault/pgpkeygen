@@ -39,6 +39,9 @@ escrowed passphrases, revocation certificates and password hashes stay out of Sp
 
 ## Setup
 
+For a fresh server, follow the copy-paste guide in [deploy.md](deploy.md) instead. This
+section explains the same steps for an existing deployment.
+
 ### Known pitfalls
 
 - **`POSTGRES_PASSWORD` is read only when the `pgdata` volume is first created.** Changing
