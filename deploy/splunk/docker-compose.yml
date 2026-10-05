@@ -1,0 +1,77 @@
+services:
+  app:
+    image: ghcr.io/gunavault/pgpkeygen:1.1.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-pgpkeygen}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}@db:5432/${POSTGRES_DB:-pgpkeygen}
+      # Generate one with: openssl rand -base64 32
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env (see .env.example)}
+      # Trust X-Forwarded-For only when a sanitizing reverse proxy is the sole ingress.
+      TRUST_PROXY_HEADERS: "true"
+      # Bound per-user stored key count.
+      MAX_KEYS_PER_USER: ${MAX_KEYS_PER_USER:-50}
+    networks:
+      default:
+        # Fixed so pg_hba.conf can allow the superuser from this one address only.
+        ipv4_address: 172.30.0.10
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/etc/postgresql/certs/server.crt
+      - -c
+      - ssl_key_file=/etc/postgresql/certs/server.key
+    ports:
+      # Replace with this server's PRIVATE IP. Never use bare "5432:5432".
+      - "10.0.0.5:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pgpkeygen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:-pgpkeygen}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./pg-certs:/etc/postgresql/certs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/etc/caddy/certs:ro
+      - caddy_data:/data
+    depends_on:
+      - app
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+          # Automatic addresses (db, caddy) come only from .128-.255,
+          # so nothing else can take the app's fixed 172.30.0.10.
+          ip_range: 172.30.0.128/25
+
+volumes:
+  pgdata:
+  caddy_data:

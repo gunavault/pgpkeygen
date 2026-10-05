@@ -27,6 +27,12 @@ pnpm audit:deps
 pnpm build
 ```
 
+Tests that need PostgreSQL to enforce privileges read `TEST_DATABASE_URL`, a role allowed to create databases and roles. They create and drop their own throwaway database. Without it they are skipped locally and fail in CI:
+
+```sh
+TEST_DATABASE_URL=postgres://user:pass@localhost:5432/postgres pnpm test
+```
+
 Run the complete required validation gate with:
 
 ```sh

@@ -122,6 +122,11 @@ Migrations run on every start via `scripts/migrate.mjs` and are idempotent
 If you run several replicas, start one first so the migration is applied once
 before the others come up.
 
+### Key expiry monitoring (Splunk)
+
+A read-only view, `soc_key_expiry`, exposes each key's title, owner and expiry for SOC
+monitoring without exposing key material. See `docs/splunk-monitoring.md`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

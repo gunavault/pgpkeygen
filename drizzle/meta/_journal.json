@@ -43,6 +43,13 @@
       "when": 1790000000000,
       "tag": "0005_session_invalidation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791169072215,
+      "tag": "0006_soc_key_expiry",
+      "breakpoints": true
     }
   ]
 }
