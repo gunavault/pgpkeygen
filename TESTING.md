@@ -43,6 +43,8 @@ CI runs lint, TypeScript checking, tests, dependency auditing, and the productio
 
 The dependency-audit gate fails on **high** and **critical** advisories. Lower-severity findings remain visible in audit output and must be tracked rather than silently ignored. The remaining known moderate advisory is the development-tool-only `esbuild` path through current stable `drizzle-kit` / `@esbuild-kit`; issue #13 documents its scope and requires a recheck no later than 2026-10-15. Once that upstream dependency path is remediated, the audit threshold should be tightened to **moderate**.
 
+One **high** advisory is explicitly ignored in `pnpm-workspace.yaml` (`auditConfig.ignoreGhsas`): GHSA-vfj7-8cjw-p6xm in `braces` <=3.0.3. No patched `braces` release exists, and it is reached only through ESLint (`eslint-config-next` > `@next/eslint-plugin-next` > `fast-glob` > `micromatch`), so it never ships in the production image. `pnpm audit` still lists it as ignored. Recheck no later than 2026-11-05 and remove the exception as soon as a patched path exists.
+
 Do not weaken the audit threshold to make a newly introduced advisory pass. Dependency exceptions must be explicit, scoped, time-bounded, and removed when the upstream constraint is resolved.
 
 ## What should be tested first
