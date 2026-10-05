@@ -2,6 +2,7 @@ import { desc } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/db/schema";
+import { appTimeZone, formatTimestamp } from "@/lib/display-time";
 
 export default async function AdminAuditLogPage() {
   const session = await auth();
@@ -17,6 +18,7 @@ export default async function AdminAuditLogPage() {
   }
 
   const entries = await db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(200);
+  const timeZone = appTimeZone();
 
   return (
     <div className="flex flex-col gap-5">
@@ -31,7 +33,7 @@ export default async function AdminAuditLogPage() {
         </div>
         <div className="flex items-center gap-2 text-xs text-muted">
           <span className="tag tag-neutral">{entries.length} entries</span>
-          <span>Last 200 events</span>
+          <span>Last 200 events · times in {timeZone}</span>
         </div>
       </div>
 
@@ -42,7 +44,7 @@ export default async function AdminAuditLogPage() {
           <table className="table">
             <thead>
               <tr>
-                <th style={{ width: 180 }}>Time</th>
+                <th style={{ width: 200 }}>Time</th>
                 <th>Actor</th>
                 <th>Action</th>
                 <th>Target</th>
@@ -53,7 +55,7 @@ export default async function AdminAuditLogPage() {
               {entries.map((entry) => (
                 <tr key={entry.id}>
                   <td className="mono text-muted whitespace-nowrap text-xs">
-                    {entry.createdAt.toLocaleString()}
+                    {formatTimestamp(entry.createdAt, timeZone)}
                   </td>
                   <td className="text-[13px]">{entry.actorEmail}</td>
                   <td>
