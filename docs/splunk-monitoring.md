@@ -39,6 +39,26 @@ escrowed passphrases, revocation certificates and password hashes stay out of Sp
 
 ## Setup
 
+### Known pitfalls
+
+- **`POSTGRES_PASSWORD` is read only when the `pgdata` volume is first created.** Changing
+  `.env` afterwards does not change the database password, and the app fails with
+  `password authentication failed for user "pgpkeygen"`. Set it to match with
+  `docker compose exec db psql -U pgpkeygen -d postgres -c '\password pgpkeygen'`.
+- **Missing bind-mount sources become empty directories.** If `./certs` or `./Caddyfile`
+  does not exist at the first `docker compose up`, Docker creates a directory in its place
+  and Caddy fails with `no such file or directory`.
+- **`sed -i` and many editors replace `pg_hba.conf` with a new file.** The running container
+  keeps the old one, so a reload changes nothing. Write into the existing file
+  (`... > /tmp/x && cat /tmp/x > pg_hba.conf`) or `docker compose restart db`. Confirm with
+  `select * from pg_hba_file_rules`.
+- **SELinux (RHEL and similar):** if Caddy logs `permission denied` on its mounts, add `,Z`
+  to them (`./Caddyfile:/etc/caddy/Caddyfile:ro,Z`).
+- **`firewall-cmd --reload` can remove Docker's port rules.** Published ports stop
+  answering while the containers keep running. Run `systemctl restart docker`.
+- **DB Connect needs an Identity.** Without one the driver sends the operating system user
+  (often `root`), which `pg_hba.conf` correctly refuses.
+
 ### 1. Create the view
 
 Releases that include migration `0006_soc_key_expiry` create it on startup. On an older
@@ -93,6 +113,8 @@ changes. Do not add `-v`: that deletes the database volume.
 
 ### 5. Configure Splunk DB Connect
 
+- **Identity:** create one with username `splunk_ro` and its password, and attach it to the
+  connection. Also fill in the connection's Host, Port and Default Database fields.
 - **Connection:** PostgreSQL, identity `splunk_ro`. Prefer a JDBC URL that verifies the
   server certificate:
   `jdbc:postgresql://<db-hostname>:5432/pgpkeygen?sslmode=verify-full&sslrootcert=/path/to/root-ca.pem`.
