@@ -9,6 +9,7 @@ import { hashPassword } from "@/lib/password";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { roleForSelfRegistration } from "@/lib/registration-policy";
+import { SELF_REGISTRATION_STATUS } from "@/lib/account-status";
 
 const REGISTER_SOURCE_LIMIT = 10;
 const REGISTER_GLOBAL_LIMIT = 100;
@@ -35,7 +36,12 @@ export async function register(formData: FormData) {
   const role = roleForSelfRegistration(email);
 
   try {
-    await db.insert(users).values({ email, passwordHash: await hashPassword(password), role });
+    await db.insert(users).values({
+      email,
+      passwordHash: await hashPassword(password),
+      role,
+      status: SELF_REGISTRATION_STATUS,
+    });
   } catch (error) {
     if (isUniqueViolation(error)) {
       redirect("/register?error=exists");
@@ -45,7 +51,7 @@ export async function register(formData: FormData) {
     redirect("/register?error=server");
   }
 
-  await logAudit(email, "user.registered");
+  await logAudit(email, "user.registered", undefined, "awaiting approval");
 
-  redirect("/login?registered=1");
+  redirect("/login?registered=pending");
 }

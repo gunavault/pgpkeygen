@@ -12,6 +12,8 @@ services:
       TRUST_PROXY_HEADERS: "true"
       # Bound per-user stored key count.
       MAX_KEYS_PER_USER: ${MAX_KEYS_PER_USER:-50}
+      # Time zone for times shown in the app (IANA name). Stored times stay UTC.
+      APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Jakarta}
     networks:
       default:
         # Fixed so pg_hba.conf can allow the superuser from this one address only.

@@ -1,6 +1,6 @@
 "use server";
 
-import { AuthError } from "next-auth";
+import { AuthError, CredentialsSignin } from "next-auth";
 import { signIn } from "@/auth";
 import { normalizeEmail } from "@/lib/identity";
 import { getClientIp, isRateLimited } from "@/lib/rate-limit";
@@ -12,7 +12,7 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 export type LoginResult =
   | { ok: true }
-  | { ok: false; error: "invalid" | "ratelimited" };
+  | { ok: false; error: "invalid" | "ratelimited" | "not_approved" };
 
 export async function login(formData: FormData): Promise<LoginResult> {
   const email = normalizeEmail(formData.get("email"));
@@ -38,6 +38,9 @@ export async function login(formData: FormData): Promise<LoginResult> {
     });
     return { ok: true };
   } catch (error) {
+    if (error instanceof CredentialsSignin && error.code === "not_approved") {
+      return { ok: false, error: "not_approved" };
+    }
     if (error instanceof AuthError) {
       return { ok: false, error: "invalid" };
     }

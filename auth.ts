@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -6,7 +6,14 @@ import { users } from "@/lib/db/schema";
 import { normalizeEmail } from "@/lib/identity";
 import { verifyPassword } from "@/lib/password";
 import { logAudit } from "@/lib/audit";
-import { isSessionValidAfterCutoff } from "@/lib/session-validity";
+import { isSessionAllowed } from "@/lib/session-validity";
+import { checkCredentials } from "@/lib/credential-check";
+
+// Thrown only after the password has been verified, so the distinction between
+// "wrong password" and "not approved yet" is never revealed to a guesser.
+export class AccountNotApproved extends CredentialsSignin {
+  code = "not_approved";
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: "jwt" },
@@ -22,14 +29,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const password = credentials?.password as string | undefined;
         if (!email || !password) return null;
 
-        const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-        if (!user || !(await verifyPassword(password, user.passwordHash))) {
-          await logAudit(email, "login.failed");
-          return null;
-        }
-
-        await logAudit(email, "login.success");
-        return { id: user.id, email: user.email, role: user.role };
+        const result = await checkCredentials(email, password, {
+          async findUserByEmail(lookup) {
+            const [user] = await db.select().from(users).where(eq(users.email, lookup)).limit(1);
+            return user ?? null;
+          },
+          verifyPassword,
+          audit: (actor, action, details) => logAudit(actor, action, undefined, details),
+        });
+        if (result.ok) return result.user;
+        if (result.reason === "not_approved") throw new AccountNotApproved();
+        return null;
       },
     }),
   ],
@@ -49,6 +59,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       const [user] = await db
         .select({
           role: users.role,
+          status: users.status,
           sessionsValidAfter: users.sessionsValidAfter,
         })
         .from(users)
@@ -62,10 +73,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             ? token.iat * 1000
             : null;
 
-      if (
-        !user ||
-        !isSessionValidAfterCutoff(issuedAtMs, user.sessionsValidAfter)
-      ) {
+      if (!isSessionAllowed(user ?? null, issuedAtMs)) {
         session.user.id = "";
         session.user.role = "user";
         return session;

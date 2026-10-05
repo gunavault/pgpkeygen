@@ -18,7 +18,10 @@ const pool = new pg.Pool({ connectionString });
 
 try {
   const result = await pool.query(
-    "update users set role = 'admin' where lower(email) = $1 returning email",
+    // Also approves the account: on a fresh install the first administrator
+    // registers like everyone else and would otherwise wait for an approval
+    // nobody can give.
+    "update users set role = 'admin', status = 'active' where lower(email) = $1 returning email",
     [email],
   );
 

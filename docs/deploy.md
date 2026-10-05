@@ -88,6 +88,8 @@ services:
       TRUST_PROXY_HEADERS: "true"
       # Bound per-user stored key count.
       MAX_KEYS_PER_USER: ${MAX_KEYS_PER_USER:-50}
+      # Time zone for times shown in the app (IANA name). Stored times stay UTC.
+      APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Jakarta}
     networks:
       default:
         # Fixed so pg_hba.conf can allow the superuser from this one address only.
@@ -209,6 +211,7 @@ POSTGRES_USER=pgpkeygen
 POSTGRES_PASSWORD=$(openssl rand -hex 32)
 POSTGRES_DB=pgpkeygen
 MAX_KEYS_PER_USER=50
+APP_TIME_ZONE=Asia/Jakarta
 EOF
   chmod 600 .env
   echo ".env created"
@@ -422,14 +425,21 @@ A lost password cannot be recovered. Run this again with a new one and update Sp
 
 ## Step 9. Create the administrator
 
-1. Open `https://<DOMAIN>` in a browser and register an account.
-2. Promote it, using the email you registered with:
+New accounts must be approved by an administrator before they can sign in, so the
+first administrator is set up from the server:
+
+1. Open `https://<DOMAIN>` in a browser and register an account. The login page says it is
+   waiting for approval.
+2. Promote and approve it, using the email you registered with:
 
    ```bash
    docker compose exec app node scripts/promote-admin.mjs you@example.com
    ```
 
-3. Sign out and sign back in to get the admin role.
+3. Sign in. From now on, approve new users under **Users** in the admin area.
+
+Times in the admin area are shown in `APP_TIME_ZONE` from `.env` (default
+`Asia/Jakarta`, UTC+7).
 
 ## Step 10. Connect Splunk DB Connect
 

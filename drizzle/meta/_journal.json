@@ -50,6 +50,13 @@
       "when": 1791169072215,
       "tag": "0006_soc_key_expiry",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791191721193,
+      "tag": "0007_user_approval",
+      "breakpoints": true
     }
   ]
 }
