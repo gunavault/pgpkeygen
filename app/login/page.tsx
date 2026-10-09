@@ -53,6 +53,12 @@ export default async function LoginPage({
               Register
             </Link>
           </p>
+          <p className="text-sm m-0" style={{ color: "var(--color-neutral-600)" }}>
+            <Link href="/reset-password" className="lnk">
+              Forgot password?
+            </Link>{" "}
+            Ask an administrator for a reset token first.
+          </p>
         </div>
       </div>
     </div>

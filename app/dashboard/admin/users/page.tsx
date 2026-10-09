@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { pgpKeys, users } from "@/lib/db/schema";
 import { appTimeZone, formatTimestamp } from "@/lib/display-time";
+import { AllowResetButton } from "./AllowResetButton";
 import { UserApprovalButtons } from "./UserApprovalButtons";
 
 const STATUS_TAG: Record<string, string> = {
@@ -31,6 +32,7 @@ export default async function AdminUsersPage() {
       role: users.role,
       status: users.status,
       createdAt: users.createdAt,
+      recoveryCreatedAt: users.recoveryCreatedAt,
       keyCount: count(pgpKeys.id),
     })
     .from(users)
@@ -71,6 +73,7 @@ export default async function AdminUsersPage() {
               <th>Status</th>
               <th style={{ width: 200 }}>Registered ({timeZone})</th>
               <th>Keys</th>
+              <th>Recovery code</th>
               <th />
             </tr>
           </thead>
@@ -88,9 +91,13 @@ export default async function AdminUsersPage() {
                   {formatTimestamp(row.createdAt, timeZone)}
                 </td>
                 <td className="mono text-xs">{row.keyCount}</td>
+                <td className="text-xs">{row.recoveryCreatedAt ? "yes" : "no"}</td>
                 <td className="whitespace-nowrap">
-                  {row.id !== session.user.id && (
+                  {row.id !== session.user.id && row.status !== "active" && (
                     <UserApprovalButtons userId={row.id} email={row.email} status={row.status} />
+                  )}
+                  {row.id !== session.user.id && row.status === "active" && (
+                    <AllowResetButton userId={row.id} email={row.email} hasRecoveryCode={row.recoveryCreatedAt !== null} />
                   )}
                 </td>
               </tr>

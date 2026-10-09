@@ -72,6 +72,19 @@ Accounts that existed before approval was introduced remain active.
 The admin area shows times in `APP_TIME_ZONE` (default `Asia/Jakarta`, UTC+7).
 Timestamps are stored in UTC.
 
+### Forgotten passwords
+
+Users can create a **recovery code** under **Account**. It is shown once and only the user
+holds it. If they forget their password, an administrator clicks **Allow reset** on the
+**Users** page and gives them the one-time token, valid 60 minutes. The user then opens
+**Forgot password?** on the sign-in page.
+
+- **With recovery code:** the password is reset and stored passphrase copies are kept.
+- **Forced reset** (no code): the password is reset and the PGP keys are kept, but stored
+  passphrase copies are removed.
+
+Administrators can never read a user's passphrases. Design: `docs/password-reset.md`.
+
 ### Provisioning an administrator
 
 Public registration always creates a normal `user` account. An email address is

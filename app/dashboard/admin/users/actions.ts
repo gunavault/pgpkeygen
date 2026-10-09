@@ -4,7 +4,14 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { auditLog, users } from "@/lib/db/schema";
+import { auditLog, passwordResets, users } from "@/lib/db/schema";
+import { generateGroupedSecret } from "@/lib/recovery-code";
+import {
+  issuePasswordReset,
+  PasswordResetError,
+  type IssueResetEnvironment,
+  type ResetMode,
+} from "@/lib/password-reset";
 import {
   decideUserApproval,
   UserApprovalError,
@@ -61,4 +68,64 @@ export async function approveUser(targetUserId: string): Promise<ApprovalResult>
 
 export async function rejectUser(targetUserId: string): Promise<ApprovalResult> {
   return decide(targetUserId, "reject");
+}
+
+const resetEnvironment: IssueResetEnvironment = {
+  now: () => new Date(),
+  generateToken: generateGroupedSecret,
+  transaction: (callback) =>
+    db.transaction((tx) =>
+      callback({
+        async findUserForUpdate(userId) {
+          const [row] = await tx
+            .select({
+              id: users.id,
+              email: users.email,
+              role: users.role,
+              status: users.status,
+              recoveryCreatedAt: users.recoveryCreatedAt,
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .for("update")
+            .limit(1);
+          return row
+            ? { id: row.id, email: row.email, role: row.role, status: row.status, hasRecoveryCode: row.recoveryCreatedAt !== null }
+            : null;
+        },
+        async saveReset(row) {
+          await tx
+            .insert(passwordResets)
+            .values(row)
+            .onConflictDoUpdate({
+              target: passwordResets.userId,
+              set: { tokenHash: row.tokenHash, mode: row.mode, issuedBy: row.issuedBy, expiresAt: row.expiresAt, attempts: 0, createdAt: new Date() },
+            });
+        },
+        async audit(actorEmail, target, details) {
+          await tx.insert(auditLog).values({ actorEmail, action: "password.reset_issued", target, details });
+        },
+      }),
+    ),
+};
+
+export type AllowResetResult = { ok: true; token: string; expiresAt: string } | { ok: false; error: string };
+
+/** Lets a user reset a forgotten password. The token is shown to the admin once, to hand over out of band. */
+export async function allowPasswordReset(targetUserId: string, mode: ResetMode): Promise<AllowResetResult> {
+  const session = await auth();
+  if (!session?.user?.id || session.user.role !== "admin") {
+    return { ok: false, error: "Only administrators can do this." };
+  }
+  try {
+    const { token, expiresAt } = await issuePasswordReset(
+      { actorId: session.user.id, targetUserId, mode },
+      resetEnvironment,
+    );
+    return { ok: true, token, expiresAt: expiresAt.toISOString() };
+  } catch (error) {
+    if (error instanceof PasswordResetError) return { ok: false, error: error.message };
+    console.error("password reset: issue failed");
+    return { ok: false, error: "Something went wrong. Try again." };
+  }
 }

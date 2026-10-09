@@ -46,13 +46,11 @@ The server does not open the vault envelope. It verifies the current account pas
 
 Accounts with no vault envelope use the same authenticated password-change path but update only the account password hash.
 
-Changing the password does **not** currently revoke already-issued JWT sessions. Session invalidation is a separate capability and must not be inferred from successful credential rotation.
+Changing the password signs out every existing session in the same transaction.
 
 ## Forgotten-password reset
 
-Password reset is intentionally not part of password rotation. With the current design, the random vault key is recoverable only through the envelope protected by the existing account password.
-
-If an operator replaced a forgotten account password without the old password or a separately provisioned recovery envelope, the account and encrypted PGP keys could remain in the database, but existing escrowed passphrase copies would become unreadable because the vault key could no longer be opened. Preserving those recovery copies across a forgotten-password reset requires an independent recovery mechanism such as a separately held recovery-code envelope.
+Password reset is separate from password rotation. The vault key can carry a second envelope wrapped under a user-held **recovery code**. An administrator-issued reset token plus that code restores the account with every escrowed passphrase intact. Without a code, a forced reset removes the escrowed copies. See [password-reset.md](password-reset.md).
 
 ## Threat model
 

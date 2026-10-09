@@ -2,7 +2,7 @@ import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { pgpKeys } from "@/lib/db/schema";
+import { pgpKeys, users } from "@/lib/db/schema";
 import { prioritizeKeysByExpiry } from "@/lib/key-expiry";
 import { keyExportFilenames } from "@/lib/key-export";
 import { CopyButton } from "./CopyButton";
@@ -26,6 +26,12 @@ export default async function DashboardPage() {
     .orderBy(desc(pgpKeys.createdAt));
 
   const prioritizedKeys = prioritizeKeysByExpiry(keys);
+  const [account] = await db
+    .select({ recoveryCreatedAt: users.recoveryCreatedAt })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const needsRecoveryCode = account ? account.recoveryCreatedAt === null : false;
 
   return (
     <div className="flex flex-col gap-5">
@@ -39,6 +45,13 @@ export default async function DashboardPage() {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
         </Link>
       </div>
+
+      {needsRecoveryCode && (
+        <p className="text-sm m-0 px-4 py-3" data-testid="recovery-code-notice" style={{ border: "1px solid var(--color-divider)" }}>
+          You have no recovery code. If you forget your password, your stored passphrase copies are lost.{" "}
+          <Link href="/dashboard/account#recovery-code" className="lnk">Create one under Account</Link>.
+        </p>
+      )}
 
       {keys.length === 0 && <p className="text-sm text-muted">No keys yet.</p>}
 

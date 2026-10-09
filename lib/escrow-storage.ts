@@ -76,3 +76,51 @@ export function escrowPayloadFromRow(row: EscrowPayloadRow): EscrowPayload | nul
     ciphertext: row.escrowCiphertext,
   });
 }
+
+export type RecoveryEnvelopeRow = {
+  recoveryWrappedKey: string | null;
+  recoveryKdfSalt: string | null;
+  recoveryKdfIv: string | null;
+  recoveryKdfIterations: number | null;
+  recoveryWrapVersion: number | null;
+};
+
+/** The recovery-code envelope uses the vault envelope's format and parser. */
+export function recoveryEnvelopeColumns(input: unknown): RecoveryEnvelopeRow {
+  const row = vaultEnvelopeColumns(input);
+  return {
+    recoveryWrappedKey: row.vaultWrappedKey,
+    recoveryKdfSalt: row.vaultKdfSalt,
+    recoveryKdfIv: row.vaultKdfIv,
+    recoveryKdfIterations: row.vaultKdfIterations,
+    recoveryWrapVersion: row.vaultWrapVersion,
+  };
+}
+
+export function recoveryEnvelopeFromRow(row: RecoveryEnvelopeRow): VaultEnvelope | null {
+  return vaultEnvelopeFromRow({
+    vaultWrappedKey: row.recoveryWrappedKey,
+    vaultKdfSalt: row.recoveryKdfSalt,
+    vaultKdfIv: row.recoveryKdfIv,
+    vaultKdfIterations: row.recoveryKdfIterations,
+    vaultWrapVersion: row.recoveryWrapVersion,
+  });
+}
+
+export const NO_RECOVERY_CODE = {
+  recoveryWrappedKey: null,
+  recoveryKdfSalt: null,
+  recoveryKdfIv: null,
+  recoveryKdfIterations: null,
+  recoveryWrapVersion: null,
+  recoveryVerifierHash: null,
+  recoveryCreatedAt: null,
+} as const;
+
+export const NO_VAULT = {
+  vaultWrappedKey: null,
+  vaultKdfSalt: null,
+  vaultKdfIv: null,
+  vaultKdfIterations: null,
+  vaultWrapVersion: null,
+} as const;

@@ -16,6 +16,11 @@ export type AuditAction =
   | "recovery.enabled"
   | "revocation.exported"
   | "revocation.forgotten"
+  | "recovery_code.created"
+  | "password.reset_issued"
+  | "password.reset"
+  | "password.reset_forced"
+  | "password.reset_failed"
   | "password.changed"
   | "password.change_failed"
   | "session.invalidated";
