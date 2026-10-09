@@ -1,10 +1,18 @@
+import { count, eq } from "drizzle-orm";
 import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
 import { LogoutButton } from "./LogoutButton";
 import { TabNav } from "./TabNav";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const isAdmin = session!.user.role === "admin";
+  const pendingUsers = isAdmin
+    ? Number(
+        (await db.select({ total: count() }).from(users).where(eq(users.status, "pending")))[0]?.total ?? 0,
+      )
+    : 0;
   const initials = (session!.user.email ?? "??").slice(0, 2).toUpperCase();
 
   return (
@@ -30,7 +38,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         >
           Vault
         </div>
-        <TabNav isAdmin={isAdmin} />
+        <TabNav isAdmin={isAdmin} pendingUsers={pendingUsers} />
         <div className="mt-auto px-5">
           <div style={{ height: 2, background: "var(--color-divider)", marginBottom: 14 }} />
           <div className="flex items-center gap-2.5 mb-3">

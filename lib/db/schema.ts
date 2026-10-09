@@ -1,10 +1,15 @@
-import { integer, pgTable, uuid, varchar, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, integer, pgTable, uuid, varchar, text, timestamp } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   role: varchar("role", { length: 20 }).notNull().default("user"),
+  // pending until an administrator approves the account. The default is the
+  // locked state so an insert that forgets to set it cannot create an open
+  // account; migration 0007 marked every pre-existing account active.
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
   sessionsValidAfter: timestamp("sessions_valid_after", { withTimezone: true }),
   // Client-created random vault key, wrapped under a password-derived KEK.
   // All fields remain nullable so existing accounts and users who never opt in
@@ -15,7 +20,9 @@ export const users = pgTable("users", {
   vaultKdfIterations: integer("vault_kdf_iterations"),
   vaultWrapVersion: integer("vault_wrap_version"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  check("users_status_check", sql`${table.status} in ('pending', 'active', 'rejected')`),
+]);
 
 export const pgpKeys = pgTable("pgp_keys", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -20,7 +20,9 @@ test("session invalidation schema and authentication-boundary wiring stay presen
   assert.match(schemaSource, /sessionsValidAfter: timestamp\("sessions_valid_after"/);
   assert.match(migrationSource, /ADD COLUMN "sessions_valid_after"/);
   assert.match(authSource, /sessionIssuedAt = Date\.now\(\)/);
-  assert.match(authSource, /isSessionValidAfterCutoff/);
+  // The cutoff (and account approval) are checked through isSessionAllowed;
+  // its behavior is exercised in account-approval-login.test.ts.
+  assert.match(authSource, /isSessionAllowed\(/);
   assert.match(authSource, /users\.sessionsValidAfter/);
   assert.match(authSource, /users\.role/);
   assert.match(authSource, /!!session\?\.user\?\.id/);

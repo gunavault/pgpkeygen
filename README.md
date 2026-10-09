@@ -30,6 +30,9 @@ Enabling recovery changes the threat model: a stolen database contains material 
 
 ## Deploying with Docker
 
+**First production deployment?** Follow [`docs/deploy.md`](docs/deploy.md): a copy-paste
+guide from a fresh server to HTTPS, the database locked down, and Splunk connected.
+
 The repo ships a multi-stage `Dockerfile` that builds a self-contained Next.js
 server (`output: "standalone"`) and a `docker-compose.yml` that runs it next to
 Postgres 16. On start the container applies any pending migrations from
@@ -58,6 +61,17 @@ Environment variables the image reads:
 | `POSTGRES_DB` | with Compose | Database name. Defaults to `pgpkeygen`. |
 | `AUTH_TRUST_HOST` | set to `true` in the image | Lets Auth.js trust the `Host` header behind a reverse proxy. Set `AUTH_URL` to your public URL instead if you prefer an explicit origin. |
 
+### Account approval
+
+New registrations start as **pending** and cannot sign in until an administrator
+approves them under **Users** in the admin area. Administrators can also reject a
+pending account; a rejected account stays blocked and can be approved later.
+Approvals, rejections and blocked sign-in attempts are recorded in the audit log.
+Accounts that existed before approval was introduced remain active.
+
+The admin area shows times in `APP_TIME_ZONE` (default `Asia/Jakarta`, UTC+7).
+Timestamps are stored in UTC.
+
 ### Provisioning an administrator
 
 Public registration always creates a normal `user` account. An email address is
@@ -65,7 +79,8 @@ not proof of ownership, so privileged roles are never derived from a submitted
 registration email.
 
 After the intended administrator has registered, an operator with database
-access can explicitly promote that existing account.
+access can explicitly promote that existing account. Promotion also approves the
+account, so the first administrator of a fresh install can sign in.
 
 From a local checkout or another trusted operator environment with `pnpm`:
 
@@ -121,6 +136,11 @@ Migrations run on every start via `scripts/migrate.mjs` and are idempotent
 (they share the `drizzle.__drizzle_migrations` table with `pnpm db:migrate`).
 If you run several replicas, start one first so the migration is applied once
 before the others come up.
+
+### Key expiry monitoring (Splunk)
+
+A read-only view, `soc_key_expiry`, exposes each key's title, owner and expiry for SOC
+monitoring without exposing key material. See `docs/splunk-monitoring.md`.
 
 ## Learn More
 
