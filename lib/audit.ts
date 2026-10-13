@@ -3,8 +3,11 @@ import { auditLog } from "./db/schema.ts";
 
 export type AuditAction =
   | "user.registered"
+  | "user.approved"
+  | "user.rejected"
   | "login.success"
   | "login.failed"
+  | "login.blocked"
   | "key.generated"
   | "key.imported"
   | "key.revoked"
@@ -13,6 +16,11 @@ export type AuditAction =
   | "recovery.enabled"
   | "revocation.exported"
   | "revocation.forgotten"
+  | "recovery_code.created"
+  | "password.reset_issued"
+  | "password.reset"
+  | "password.reset_forced"
+  | "password.reset_failed"
   | "password.changed"
   | "password.change_failed"
   | "session.invalidated";

@@ -13,6 +13,8 @@ services:
       TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
       # Bound per-user stored key count.
       MAX_KEYS_PER_USER: ${MAX_KEYS_PER_USER:-50}
+      # Time zone for times shown in the app (IANA name). Stored times stay UTC.
+      APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Jakarta}
     depends_on:
       db:
         condition: service_healthy

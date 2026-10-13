@@ -133,7 +133,12 @@ function aadFor(context: EscrowContext): Uint8Array {
   return encoder.encode(`pgpkeygen:passphrase-escrow:v1\0${userId}\0${fingerprint}`);
 }
 
-async function wrapVaultKey(password: string, vaultKey: Uint8Array): Promise<VaultEnvelope> {
+/**
+ * Wraps an existing vault key under a secret. The account password is one
+ * secret; a recovery code is another, giving the same vault key a second,
+ * independently held envelope in the same format.
+ */
+export async function wrapVaultKey(password: string, vaultKey: Uint8Array): Promise<VaultEnvelope> {
   if (vaultKey.length !== VAULT_KEY_BYTES) throw new Error("Invalid vault key");
 
   const salt = randomBytes(SALT_BYTES);

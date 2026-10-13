@@ -6,7 +6,17 @@ RUN corepack enable
 # ---- deps: install with the lockfile only, so this layer caches well ----
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+# The supply-chain check alone downloads ~230 MB of registry metadata (next's
+# is 25 MB), which a slow or proxied link cannot fetch within pnpm's 60 s
+# per-request default. Allow 10 minutes and more retries, and keep pnpm's
+# cache and store in a BuildKit cache mount: a failed build resumes where it
+# stopped, and later builds skip the check once this lockfile has passed it.
+# pnpm 11 reads pnpm_config_*, not npm_config_*.
+ENV pnpm_config_store_dir=/pnpm/store \
+    pnpm_config_cache_dir=/pnpm/cache \
+    pnpm_config_fetch_timeout=600000 \
+    pnpm_config_fetch_retries=5
+RUN --mount=type=cache,id=pnpm,target=/pnpm pnpm install --frozen-lockfile
 
 # ---- build: compile the standalone Next.js server ----
 FROM base AS build

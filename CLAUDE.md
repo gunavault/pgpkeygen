@@ -110,7 +110,8 @@ quota checks cannot race. Keep new per-user quota logic inside that lock.
 - `package.json` says `version: 0.1.0` while tags `v1.0.0` and `v1.1.0` exist. There is no
   `CHANGELOG.md`.
 - The test added by PR #49 cannot fail: reverting the fix leaves the suite fully green.
-- The account password is the root of the vault KDF, so **password reset is impossible**
-  without destroying every escrowed passphrase. This is the driver behind the V2 work on
-  branch `v2` and the design discussion in issue #36. Do not implement a reset that clears
-  vault state.
+- Forgotten passwords: decided by the maintainer for issue #36 (see `docs/password-reset.md`).
+  A reset needs an admin-issued single-use token. With the user's own **recovery code** (a
+  second envelope over the same vault key) the escrowed passphrases survive. Without one, a
+  **forced reset** clears the vault and escrow on purpose, and that is the only reset allowed
+  to. Never give administrators or the server a way to open a user's vault key.

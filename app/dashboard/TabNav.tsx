@@ -9,11 +9,19 @@ const BASE_TABS: { href: string; label: string; badge?: string }[] = [
   { href: "/dashboard/import", label: "Import" },
   { href: "/dashboard/account", label: "Account" },
 ];
-const ADMIN_TAB = { href: "/dashboard/admin", label: "Audit log", badge: "ADMIN" };
+const ADMIN_TABS = [
+  { href: "/dashboard/admin/users", label: "Users", badge: "ADMIN" },
+  { href: "/dashboard/admin", label: "Audit log", badge: "ADMIN" },
+];
 
-export function TabNav({ isAdmin }: { isAdmin: boolean }) {
+export function TabNav({ isAdmin, pendingUsers = 0 }: { isAdmin: boolean; pendingUsers?: number }) {
   const pathname = usePathname();
-  const tabs = isAdmin ? [...BASE_TABS, ADMIN_TAB] : BASE_TABS;
+  const adminTabs = ADMIN_TABS.map((tab) =>
+    tab.href === "/dashboard/admin/users" && pendingUsers > 0
+      ? { ...tab, badge: `${pendingUsers} PENDING` }
+      : tab,
+  );
+  const tabs = isAdmin ? [...BASE_TABS, ...adminTabs] : BASE_TABS;
 
   return (
     <nav className="flex flex-col">

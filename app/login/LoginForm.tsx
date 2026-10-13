@@ -13,7 +13,7 @@ import {
 } from "@/lib/vault-escrow";
 import { login } from "./actions";
 
-type LoginError = "invalid" | "ratelimited" | "recovery" | null;
+type LoginError = "invalid" | "ratelimited" | "recovery" | "not_approved" | null;
 
 export function LoginForm({
   initialError = null,
@@ -93,12 +93,17 @@ export function LoginForm({
 
       {registered && (
         <p className="text-sm m-0" style={{ color: "var(--color-accent-700)" }}>
-          Account created. Sign in below.
+          Account created. An administrator must approve it before you can sign in.
         </p>
       )}
       {error === "ratelimited" && (
         <p className="text-sm m-0" style={{ color: "var(--color-accent-700)" }}>
           Too many attempts. Try again in a few minutes.
+        </p>
+      )}
+      {error === "not_approved" && (
+        <p className="text-sm m-0" style={{ color: "var(--color-accent-700)" }}>
+          Your account is not approved yet. Ask an administrator to approve it, then sign in again.
         </p>
       )}
       {error === "invalid" && (

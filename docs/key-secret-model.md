@@ -28,13 +28,11 @@ When the account has escrowed PGP passphrases, the browser also opens one owner-
 
 The server never performs vault cryptography. It verifies the current account password, validates the opaque candidate envelope, rejects reused envelope salt or IV values, and commits the new password hash, envelope, and `password.changed` audit event in one database transaction. Accounts with no vault envelope update only the password hash.
 
-Changing the password does not currently invalidate already-issued JWT sessions. Session invalidation is a separate account-security capability rather than part of vault rotation.
+Changing the password also signs out every existing session, in the same transaction (see Session invalidation below).
 
 ## Forgotten-password reset cost
 
-A forgotten-password reset is **not implemented** by this flow. The current vault key has only the account-password-wrapped envelope. Without the old password or a separately provisioned recovery envelope/code, an operator can replace the account credential but cannot recover or re-wrap that vault key.
-
-That means an operator-assisted reset built on the current model would preserve the account and stored encrypted PGP keys but would orphan the existing escrowed passphrase recovery copies. The underlying PGP keys are not deleted; the recovery ciphertexts simply become unreadable because the old vault key can no longer be opened. A reset path that preserves recovery requires a second independently held recovery mechanism and must be designed separately.
+A forgotten password is reset through an administrator-issued, single-use reset token. A user who made a **recovery code** keeps their escrowed passphrases: the code wraps the same vault key in a second envelope that only the user can open. Without a code, a **forced reset** keeps the account and its encrypted PGP keys but removes the escrowed passphrase copies, since nobody can open the old vault key. Neither path lets an administrator read a passphrase. Details: [password-reset.md](password-reset.md).
 
 ## Security tradeoff
 
