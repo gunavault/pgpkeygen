@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RecoveryCodeReveal } from "@/app/dashboard/account/RecoveryCodeReveal";
-import { deriveRecoveryVerifier, provisionRecoveryCode, unwrapWithRecoveryCode } from "@/lib/recovery-code";
+import { SecretTag } from "@/app/SecretTag";
+import { deriveRecoveryVerifier, normalizeGroupedSecret, provisionRecoveryCode, unwrapWithRecoveryCode } from "@/lib/recovery-code";
 import { wrapVaultKey, type VaultEnvelope } from "@/lib/vault-escrow";
 import { verifyVaultEnvelopeContinuity } from "@/lib/vault-rotation";
 import { finishForcedReset, finishRecoveryReset, startReset } from "./actions";
@@ -56,6 +57,13 @@ export function ResetPasswordForm() {
     const newPassword = readPasswords(data);
     if (!newPassword) return;
     const code = String(data.get("recoveryCode") ?? "");
+    // Both secrets share a format; the likeliest slip is pasting the reset
+    // token again. Say so instead of a bare "does not open your vault".
+    const typed = normalizeGroupedSecret(code);
+    if (typed && typed === normalizeGroupedSecret(step.token)) {
+      setError("That is the reset token from your administrator, which you already used in step 1. Here, enter your own recovery code: the one you saved when you created it.");
+      return;
+    }
 
     setBusy(true);
     let vaultKey: Uint8Array | null = null;
@@ -106,6 +114,19 @@ export function ResetPasswordForm() {
     } finally { setBusy(false); }
   }
 
+  // Each step's form carries its own key. The steps share a layout, so
+  // without one React reuses the previous step's inputs and the email typed
+  // in step one shows up in the recovery code field.
+  //
+  // Password managers also take the text input just before a new-password
+  // field for the username and may autofill the saved email into it. The
+  // read-only account field gives them the real username, which keeps them
+  // out of the recovery code and files the new password under the right
+  // account.
+  const accountField = (email: string) => (
+    <div className="field"><label htmlFor="reset-account">Account</label><input id="reset-account" name="username" type="email" autoComplete="username" value={email} readOnly className="input" /></div>
+  );
+
   const passwordFields = (
     <>
       <div className="field"><label htmlFor="reset-new">New password</label><input id="reset-new" name="newPassword" type="password" autoComplete="new-password" minLength={8} required className="input" /></div>
@@ -113,10 +134,26 @@ export function ResetPasswordForm() {
     </>
   );
 
+  const steps = (current: 1 | 2, second: string) => (
+    <ol className="steps m-0 p-0" aria-label="Reset steps">
+      <li aria-current={current === 1 ? "step" : undefined} data-done={current > 1 ? "" : undefined}>1 · Reset token</li>
+      <li aria-current={current === 2 ? "step" : undefined}>2 · {second}</li>
+    </ol>
+  );
+
+  const tokenAccepted = (email: string) => (
+    <p className="text-sm m-0" data-testid="token-accepted">
+      <span aria-hidden="true">✓ </span>Reset token accepted for <strong>{email}</strong>.
+    </p>
+  );
+
   if (step.kind === "new-code") {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-sm m-0">Your password is reset and your stored passphrase copies are kept. Your old recovery code no longer works; this is your new one.</p>
+        <p className="text-sm m-0">
+          Your password is reset and your stored passphrase copies are kept. Your old recovery code no longer
+          works. Below is your <strong>new recovery code</strong>.
+        </p>
         <RecoveryCodeReveal code={step.code} doneLabel="Go to sign in" onDone={() => router.push("/login")} />
       </div>
     );
@@ -137,11 +174,24 @@ export function ResetPasswordForm() {
 
   if (step.kind === "recovery") {
     return (
-      <form onSubmit={handleRecovery} className="flex flex-col gap-4">
-        <p className="text-sm m-0">Enter the recovery code you saved and choose a new password. Your stored passphrase copies are kept.</p>
-        <div className="field"><label htmlFor="reset-code">Recovery code</label><input id="reset-code" name="recoveryCode" autoComplete="off" required className="input mono" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX" /></div>
+      <form key="recovery" onSubmit={handleRecovery} className="flex flex-col gap-4">
+        {steps(2, "Recovery code and new password")}
+        {tokenAccepted(step.email)}
+        {accountField(step.email)}
+        <div className="secret-panel secret-panel-recovery">
+          <SecretTag kind="recovery" />
+          <div className="field">
+            <label htmlFor="reset-code">Your recovery code</label>
+            <input id="reset-code" name="recoveryCode" autoComplete="off" autoCapitalize="characters" spellCheck={false} required className="input mono" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX" aria-describedby="reset-code-help" />
+          </div>
+          <p id="reset-code-help" className="secret-help">
+            The code you saved yourself when you created it under Account, for example in
+            {" "}<span className="mono">pgpkeygen-recovery-code.txt</span>. Not the reset token from step 1.
+          </p>
+        </div>
+        <p className="text-sm m-0" style={{ color: "var(--color-neutral-700)" }}>Choose a new password. Your stored passphrase copies are kept.</p>
         {passwordFields}
-        {error && <p className="text-sm m-0" style={errorStyle}>{error}</p>}
+        {error && <p className="text-sm m-0" role="alert" style={errorStyle}>{error}</p>}
         <button type="submit" disabled={busy} className="btn btn-primary self-start">{busy ? "Resetting…" : "Reset password"}</button>
       </form>
     );
@@ -149,31 +199,57 @@ export function ResetPasswordForm() {
 
   if (step.kind === "forced") {
     return (
-      <form onSubmit={handleForced} className="flex flex-col gap-4">
+      <form key="forced" onSubmit={handleForced} className="flex flex-col gap-4">
+        {steps(2, "New password")}
+        {tokenAccepted(step.email)}
         <p className="text-sm m-0" style={errorStyle}>
-          Your administrator allowed a reset without a recovery code. Your PGP keys are kept, but every
-          passphrase copy stored in your recovery vault will be removed. Keys you still know the
+          Your administrator allowed a reset without a recovery code, so you do not need one. Your PGP keys are
+          kept, but every passphrase copy stored in your recovery vault will be removed. Keys you still know the
           passphrase for keep working.
         </p>
+        {accountField(step.email)}
         {passwordFields}
         <label className="flex items-start gap-3 text-sm">
           <input type="checkbox" name="acknowledge" required style={{ marginTop: 3 }} />
           <span>I understand my stored passphrase copies will be removed.</span>
         </label>
-        {error && <p className="text-sm m-0" style={errorStyle}>{error}</p>}
+        {error && <p className="text-sm m-0" role="alert" style={errorStyle}>{error}</p>}
         <button type="submit" disabled={busy} className="btn btn-primary self-start">{busy ? "Resetting…" : "Reset password"}</button>
       </form>
     );
   }
 
   return (
-    <form onSubmit={handleToken} className="flex flex-col gap-4">
-      <p className="text-sm m-0" style={{ color: "var(--color-neutral-600)" }}>
-        Ask an administrator to allow a password reset. They will give you a reset token, valid for 60 minutes.
-      </p>
+    <form key="token" onSubmit={handleToken} className="flex flex-col gap-4">
+      {steps(1, "Recovery code and new password")}
+      <div className="flex flex-col gap-3 text-sm" data-testid="reset-needs">
+        <p className="m-0">A password reset uses two different codes. They look alike, so check which one you are typing:</p>
+        <ul className="secret-list">
+          <li>
+            <SecretTag kind="token" />
+            <span>Ask your administrator for it. It works once and expires after 60 minutes. <strong>Needed now.</strong></span>
+          </li>
+          <li className="secret-list-recovery">
+            <SecretTag kind="recovery" />
+            <span>The code you saved yourself. Needed in step 2, unless your administrator chose a reset without it.</span>
+          </li>
+        </ul>
+      </div>
       <div className="field"><label htmlFor="reset-email">Email</label><input id="reset-email" name="email" type="email" autoComplete="email" required className="input" /></div>
-      <div className="field"><label htmlFor="reset-token">Reset token</label><input id="reset-token" name="token" autoComplete="off" required className="input mono" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX" /></div>
-      {error && <p className="text-sm m-0" style={errorStyle}>{error}</p>}
+      <div className="secret-panel">
+        <SecretTag kind="token" />
+        <div className="field">
+          <label htmlFor="reset-token">Reset token</label>
+          <input id="reset-token" name="token" autoComplete="off" autoCapitalize="characters" spellCheck={false} required className="input mono" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XX" aria-describedby="reset-token-help" />
+        </div>
+        <p id="reset-token-help" className="secret-help">The one-time token your administrator just gave you, not your recovery code.</p>
+      </div>
+      {error && (
+        <p className="text-sm m-0" role="alert" style={errorStyle}>
+          {error}
+          {!error.startsWith("Too many") && " Make sure you entered the reset token from your administrator, not your own recovery code."}
+        </p>
+      )}
       <button type="submit" disabled={busy} className="btn btn-primary self-start">{busy ? "Checking…" : "Continue"}</button>
     </form>
   );

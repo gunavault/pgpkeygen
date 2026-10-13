@@ -153,3 +153,36 @@ textarea.input { min-height: 90px; resize: vertical; }
   border-bottom: 1px solid var(--color-divider);
 }
 .table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+
+/* — the two secrets in a password reset —
+   A reset token comes from an administrator and expires; a recovery code is
+   the user's own and lasts. They share a format, so every place either one
+   appears marks it with its own colour, tag and wording. */
+:root {
+  --color-token: var(--color-neutral-900);
+  --color-recovery: var(--color-accent);
+}
+.tag-token { background: var(--color-token); color: var(--color-bg); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.tag-recovery { background: var(--color-accent-200); color: var(--color-accent-800); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.secret-panel { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-4); background: var(--color-neutral-100); border-left: 4px solid var(--color-token); }
+.secret-panel-recovery { border-left-color: var(--color-recovery); background: var(--color-accent-100); }
+.secret-panel .field > label { color: var(--color-text); font-size: 13px; font-weight: 600; }
+.secret-panel .input { background: var(--color-bg); }
+.secret-help { font-size: 12px; margin: 0; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.secret-value { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 15px; letter-spacing: 0.06em; word-break: break-all; padding: 10px 14px; background: var(--color-bg); border: 1px solid var(--color-divider); }
+.steps { display: flex; gap: var(--space-2); font-size: 12px; }
+.steps > li { list-style: none; flex: 1; padding-top: 6px; border-top: 3px solid var(--color-neutral-300); color: var(--color-neutral-600); }
+.steps > li[aria-current="step"] { border-top-color: var(--color-text); color: var(--color-text); font-weight: 600; }
+.steps > li[data-done] { border-top-color: var(--color-text); }
+.secret-panel > .tag, .secret-list .tag { align-self: flex-start; }
+.secret-value-sm { font-size: 12.5px; letter-spacing: 0.02em; padding: 8px 10px; }
+.secret-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; }
+.secret-list > li { list-style: none; display: flex; flex-direction: column; gap: 4px; padding-left: var(--space-3); border-left: 4px solid var(--color-token); }
+.secret-list > li.secret-list-recovery { border-left-color: var(--color-recovery); }
+
+/* — dialog — */
+.dialog-backdrop { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: var(--space-4); background: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.dialog { white-space: normal; overflow-wrap: anywhere; width: 100%; max-width: 460px; max-height: calc(100vh - 32px); overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6); background: var(--color-bg); box-shadow: var(--shadow-lg); text-align: left; font-size: 14px; }
+.dialog h3 { font-size: 20px; margin: 0; }
+.choice { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-divider); }
+.choice p { margin: 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 75%, transparent); }

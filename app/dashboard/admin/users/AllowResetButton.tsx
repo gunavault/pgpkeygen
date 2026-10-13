@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { CopyButton } from "../../CopyButton";
+import { SecretTag } from "@/app/SecretTag";
 import { allowPasswordReset } from "./actions";
 
 /**
@@ -43,49 +44,85 @@ export function AllowResetButton({
     });
   }
 
-  if (issued) {
-    return (
-      <div className="flex flex-col items-end gap-1 text-xs max-w-xs" data-testid="reset-token-panel">
-        <span className="text-muted">
-          {issued.mode === "recovery" ? "Recovery reset" : "Forced reset"} token for {email}, valid 60 minutes, shown once:
-        </span>
-        <span className="mono text-[13px]" data-testid="reset-token">{issued.token}</span>
-        <div className="flex items-center gap-2">
-          <CopyButton text={issued.token} />
-          <button type="button" className="lnk" onClick={() => { setIssued(null); setOpen(false); }}>Close</button>
-        </div>
-        <span className="text-muted">Give it to the user over a channel you trust. They open “Forgot password?” on the sign-in page.</span>
-      </div>
-    );
-  }
+  const close = () => { setIssued(null); setOpen(false); setError(null); };
 
-  if (!open) {
-    return (
-      <button type="button" className="lnk text-xs" onClick={() => setOpen(true)}>
-        Allow reset
-      </button>
-    );
-  }
+  useEffect(() => {
+    if (!open && !issued) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { setIssued(null); setOpen(false); setError(null); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, issued]);
+
+  const trigger = (
+    <button type="button" className="lnk text-xs" onClick={() => setOpen(true)}>
+      Allow reset
+    </button>
+  );
+
+  if (!open && !issued) return trigger;
 
   return (
-    <div className="flex flex-col items-end gap-1 text-xs">
-      <div className="flex gap-2">
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={pending || !hasRecoveryCode}
-          title={hasRecoveryCode ? "" : "This user has no recovery code"}
-          onClick={() => issue("recovery")}
-        >
-          With recovery code
-        </button>
-        <button type="button" className="btn btn-secondary" disabled={pending} onClick={() => issue("forced")}>
-          Forced reset
-        </button>
-        <button type="button" className="lnk" onClick={() => setOpen(false)}>Cancel</button>
+    <>
+      {trigger}
+      <div className="dialog-backdrop" onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
+        <div className="dialog" role="dialog" aria-modal="true" aria-labelledby={`reset-title-${userId}`}>
+          {issued ? (
+            <div className="flex flex-col gap-3" data-testid="reset-token-panel">
+              <h3 id={`reset-title-${userId}`}>Reset token for {email}</h3>
+              <div className="secret-panel">
+                <SecretTag kind="token" />
+                <p className="text-sm m-0">
+                  {issued.mode === "recovery" ? "Recovery reset" : "Forced reset"}. Valid 60 minutes, works once,
+                  shown only now:
+                </p>
+                <div className="secret-value" data-testid="reset-token">{issued.token}</div>
+                <div className="flex items-center gap-3"><CopyButton text={issued.token} /></div>
+              </div>
+              <p className="text-sm m-0">
+                Give it to the user over a channel you trust. They open <strong>“Forgot password?”</strong> on the
+                sign-in page and enter it in step 1.
+              </p>
+              <p className="text-sm m-0" style={{ color: "var(--color-neutral-700)" }}>
+                {issued.mode === "recovery"
+                  ? "This is not their recovery code. In step 2 they also enter their own recovery code, which only they have. You cannot see it or send it to them."
+                  : "They do not need a recovery code for this reset. Their stored passphrase copies will be removed; their PGP keys are kept."}
+              </p>
+              <button type="button" className="btn btn-secondary self-start" onClick={close}>Close</button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <h3 id={`reset-title-${userId}`}>Allow a password reset for {email}</h3>
+              <p className="text-sm m-0" style={{ color: "var(--color-neutral-700)" }}>
+                You get a one-time <strong>reset token</strong> to give to the user. Choose what happens to their
+                stored passphrase copies:
+              </p>
+              <div className="choice">
+                <button
+                  type="button"
+                  className="btn btn-primary self-start"
+                  disabled={pending || !hasRecoveryCode}
+                  onClick={() => issue("recovery")}
+                >
+                  With recovery code
+                </button>
+                <p>
+                  {hasRecoveryCode
+                    ? "Keeps their stored passphrase copies. After your reset token, they enter their own recovery code."
+                    : "Not possible: this user has never created a recovery code."}
+                </p>
+              </div>
+              <div className="choice">
+                <button type="button" className="btn btn-secondary self-start" disabled={pending} onClick={() => issue("forced")}>
+                  Forced reset
+                </button>
+                <p>No recovery code needed. Their stored passphrase copies are removed; their PGP keys are kept.</p>
+              </div>
+              {error && <p className="text-sm m-0" role="alert" style={{ color: "var(--color-accent-700)" }}>{error}</p>}
+              <button type="button" className="lnk self-start" onClick={close}>Cancel</button>
+            </div>
+          )}
+        </div>
       </div>
-      {!hasRecoveryCode && <span className="text-muted">No recovery code: only a forced reset is possible.</span>}
-      {error && <span style={{ color: "var(--color-accent-700)" }}>{error}</span>}
-    </div>
+    </>
   );
 }

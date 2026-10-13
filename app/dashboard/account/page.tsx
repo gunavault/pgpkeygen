@@ -6,6 +6,7 @@ import { appTimeZone, formatTimestamp } from "@/lib/display-time";
 import { PasswordChangeForm } from "./PasswordChangeForm";
 import { RecoveryCodeSection } from "./RecoveryCodeSection";
 import { SessionInvalidationButton } from "./SessionInvalidationButton";
+import { SecretTag } from "@/app/SecretTag";
 
 export default async function AccountPage() {
   const session = await auth();
@@ -42,11 +43,15 @@ export default async function AccountPage() {
 
       <section className="flex flex-col gap-3 max-w-2xl" id="recovery-code">
         <div>
-          <h2 className="text-xl m-0">Recovery code</h2>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="text-xl m-0">Recovery code</h2>
+            <SecretTag kind="recovery" />
+          </div>
           <p className="text-sm text-muted mt-2 mb-0">
-            If you forget your password, an administrator can allow a reset, and this code lets you
-            keep your stored passphrase copies. Only you hold it: the server keeps neither the code
-            nor anything that reveals it.
+            If you forget your password, you need two things: a one-time <strong>reset token</strong> that
+            your administrator gives you, and this <strong>recovery code</strong>, which keeps your stored
+            passphrase copies. Only you hold the recovery code: neither your administrator nor the server
+            can see it or give it back to you.
           </p>
         </div>
         <RecoveryCodeSection createdAt={recoveryCreatedAt} />
