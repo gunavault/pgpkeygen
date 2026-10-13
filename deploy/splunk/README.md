@@ -10,6 +10,8 @@ verbatim, so nothing has to be copied from here by hand.
 - `pg_hba.conf`: admits the `pgpkeygen` superuser only from the app container, and
   `splunk_ro` only from the Splunk server over TLS.
 - `Caddyfile`: TLS termination with your own certificate, proxying to the app.
+- `remove-splunk-role.sql`: phase 3 of the move to Wazuh; ends Splunk's sessions and drops
+  `splunk_ro`. See `docs/wazuh-monitoring.md`.
 
 `__SERVER_IP__`, `__SPLUNK_IP__`, `__DOMAIN__` and `__IMAGE_TAG__` are placeholders; step 4e of
 the guide fills them in.

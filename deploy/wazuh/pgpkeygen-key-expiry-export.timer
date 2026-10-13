@@ -1,0 +1,11 @@
+# Runs the export once a day. Persistent=true catches up after downtime.
+# Install: /etc/systemd/system/pgpkeygen-key-expiry-export.timer
+[Unit]
+Description=Daily pgpkeygen key-expiry export for Wazuh
+
+[Timer]
+OnCalendar=*-*-* 06:52:00 Asia/Jakarta
+Persistent=true
+
+[Install]
+WantedBy=timers.target

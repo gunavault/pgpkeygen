@@ -1,0 +1,8 @@
+<!--
+  Add inside <ossec_config> in /var/ossec/etc/ossec.conf on the Wazuh agent of
+  the server that runs pgpkeygen, then: systemctl restart wazuh-agent
+-->
+<localfile>
+  <log_format>json</log_format>
+  <location>/var/log/pgpkeygen/key-expiry.json</location>
+</localfile>

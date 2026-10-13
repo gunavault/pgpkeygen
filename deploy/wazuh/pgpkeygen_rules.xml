@@ -1,0 +1,77 @@
+<!--
+  pgpkeygen key-expiry rules for the Wazuh manager.
+  Install: /var/ossec/etc/rules/pgpkeygen_rules.xml, then restart the manager.
+
+  Input: JSON lines from export-key-expiry.sh, read by the agent with
+  <log_format>json</log_format>. One "key_expiry" event per key per day, one
+  "export_summary" per run, and "export_failed" when a run fails.
+
+  Levels match the Splunk alert (expiry_status IN ("expired","expiring")) so
+  the two can be compared during the parallel run:
+    expired 10, expiring within 7 days 9, expiring 7, export failed 12,
+    revoked / healthy / never / summary 3 (inventory, no alerting).
+  Rule IDs 100500-100509 are reserved for pgpkeygen; change them if your
+  manager already uses that range.
+-->
+<group name="pgpkeygen,key_expiry,">
+
+  <rule id="100500" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="app">^pgpkeygen$</field>
+    <description>pgpkeygen events.</description>
+  </rule>
+
+  <rule id="100501" level="3">
+    <if_sid>100500</if_sid>
+    <field name="event_type">^key_expiry$</field>
+    <field name="expiry_status">^healthy$</field>
+    <description>pgpkeygen: key "$(title)" of $(owner_email) is healthy ($(days_remaining) days left).</description>
+  </rule>
+
+  <rule id="100508" level="3">
+    <if_sid>100500</if_sid>
+    <field name="event_type">^key_expiry$</field>
+    <field name="expiry_status">^never$</field>
+    <description>pgpkeygen: key "$(title)" of $(owner_email) has no expiry date.</description>
+  </rule>
+
+  <rule id="100502" level="3">
+    <if_sid>100500</if_sid>
+    <field name="event_type">^key_expiry$</field>
+    <field name="expiry_status">^revoked$</field>
+    <description>pgpkeygen: key "$(title)" of $(owner_email) is revoked.</description>
+  </rule>
+
+  <rule id="100503" level="7">
+    <if_sid>100500</if_sid>
+    <field name="event_type">^key_expiry$</field>
+    <field name="expiry_status">^expiring$</field>
+    <description>pgpkeygen: key "$(title)" of $(owner_email) expires in $(days_remaining) days.</description>
+  </rule>
+
+  <rule id="100504" level="9">
+    <if_sid>100503</if_sid>
+    <field name="days_remaining" type="pcre2">^[0-7]$</field>
+    <description>pgpkeygen: key "$(title)" of $(owner_email) expires in $(days_remaining) days.</description>
+  </rule>
+
+  <rule id="100505" level="10">
+    <if_sid>100500</if_sid>
+    <field name="event_type">^key_expiry$</field>
+    <field name="expiry_status">^expired$</field>
+    <description>pgpkeygen: key "$(title)" of $(owner_email) has expired and is not revoked.</description>
+  </rule>
+
+  <rule id="100506" level="3">
+    <if_sid>100500</if_sid>
+    <field name="event_type">^export_summary$</field>
+    <description>pgpkeygen: key-expiry export ran: $(keys_total) keys, $(expired) expired, $(expiring) expiring.</description>
+  </rule>
+
+  <rule id="100507" level="12">
+    <if_sid>100500</if_sid>
+    <field name="event_type">^export_failed$</field>
+    <description>pgpkeygen: key-expiry export failed ($(reason)); the snapshot is stale.</description>
+  </rule>
+
+</group>

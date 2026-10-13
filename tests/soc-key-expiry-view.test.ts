@@ -13,6 +13,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 const adminUrl = process.env.TEST_DATABASE_URL;
 const migrationsFolder = new URL("../drizzle", import.meta.url).pathname;
 const roleSql = readFileSync(new URL("../deploy/splunk/splunk-role.sql", import.meta.url), "utf8");
+const removeSql = readFileSync(new URL("../deploy/splunk/remove-splunk-role.sql", import.meta.url), "utf8");
 
 const EXPECTED_COLUMNS = [
   "key_id",
@@ -146,8 +147,32 @@ test("splunk_ro reads key expiry through soc_key_expiry and nothing else", async
     await owner.query(roleSql);
     await expectDenied(splunk, "SELECT private_key FROM pgp_keys LIMIT 1");
     await expectDenied(splunk, "SELECT password_hash FROM users LIMIT 1");
+
+    // Retiring Splunk (phase 3 of the move to Wazuh) removes the login, ends
+    // the session DB Connect already holds, and keeps the view for Wazuh.
+    // Only when this test created splunk_ro: never drop a role it found.
+    if (createdRole) {
+      const { rows: [{ pid }] } = await splunk.query("SELECT pg_backend_pid() AS pid");
+      splunk.on("error", () => {});
+      await owner.query(removeSql);
+      // Termination is signalled, so give the backend a moment to exit.
+      let alive = true;
+      for (let i = 0; i < 50 && alive; i++) {
+        const { rowCount } = await admin.query("SELECT 1 FROM pg_stat_activity WHERE pid = $1", [pid]);
+        alive = rowCount !== 0;
+        if (alive) await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      assert.equal(alive, false, "the open Splunk session must be ended");
+      await splunk.end().catch(() => {});
+      splunk = undefined;
+      const gone = await admin.query("SELECT 1 FROM pg_roles WHERE rolname = 'splunk_ro'");
+      assert.equal(gone.rowCount, 0, "splunk_ro must be dropped");
+      const stillThere = await owner.query("SELECT count(*)::int AS n FROM soc_key_expiry");
+      assert.equal(stillThere.rows[0].n, 5, "the view stays for the Wazuh export");
+      await owner.query(removeSql); // safe to re-run
+    }
   } finally {
-    await splunk?.end();
+    await splunk?.end().catch(() => {});
     await owner.end();
     await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`);
     if (createdRole) await admin.query("DROP ROLE IF EXISTS splunk_ro");
