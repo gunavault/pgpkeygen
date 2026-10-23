@@ -155,6 +155,12 @@ before the others come up.
 A read-only view, `soc_key_expiry`, exposes each key's title, owner and expiry for SOC
 monitoring without exposing key material. See `docs/splunk-monitoring.md`.
 
+### Key expiry monitoring (Wazuh)
+
+A daily export writes the same view as JSON lines for the Wazuh agent, with alert rules for
+expired and expiring keys. It runs alongside Splunk and supports retiring Splunk later. See
+`docs/wazuh-monitoring.md`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

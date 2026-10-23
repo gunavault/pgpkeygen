@@ -1,0 +1,11 @@
+# Install: /etc/logrotate.d/pgpkeygen
+# The Wazuh agent follows the rename and starts reading the new file.
+/var/log/pgpkeygen/key-expiry.json {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+}

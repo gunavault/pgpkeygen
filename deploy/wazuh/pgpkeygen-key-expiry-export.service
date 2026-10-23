@@ -1,0 +1,15 @@
+# Writes the daily key-expiry snapshot for the Wazuh agent.
+# Install: /etc/systemd/system/pgpkeygen-key-expiry-export.service
+[Unit]
+Description=Export pgpkeygen key expiry for Wazuh
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=COMPOSE_FILE_PATH=/opt/pgpkeygen/docker-compose.yml
+Environment=EXPORT_FILE=/var/log/pgpkeygen/key-expiry.json
+ExecStart=/opt/pgpkeygen/wazuh/export-key-expiry.sh
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes

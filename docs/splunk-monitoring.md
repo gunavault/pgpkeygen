@@ -4,6 +4,9 @@ The SOC team can watch every stored key's expiry from Splunk without any access 
 material. Splunk DB Connect logs in as a dedicated read-only role, `splunk_ro`, which can
 read one view, `soc_key_expiry`, and nothing else.
 
+The same data can also go to Wazuh, and Splunk can be retired afterwards: see
+[`docs/wazuh-monitoring.md`](wazuh-monitoring.md).
+
 ## What Splunk sees
 
 `soc_key_expiry` (created by migration `0006_soc_key_expiry`) has one row per stored key:
